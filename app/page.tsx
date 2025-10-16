@@ -19,7 +19,6 @@ import { AuthPage } from "@/components/auth-page"
 import { onAuthStateChanged } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import { getUserProfile, signOutUser, type UserProfile } from "@/lib/auth-service"
-import { WelcomeModal } from "@/components/welcome-modal"
 
 export default function TradingDashboard() {
   const [activeView, setActiveView] = useState<
@@ -30,26 +29,15 @@ export default function TradingDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [userName, setUserName] = useState("")
-  const [userCurrency, setUserCurrency] = useState("USD")
-  const [userCountry, setUserCountry] = useState("")
-  const [showWelcomeModal, setShowWelcomeModal] = useState(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user && user.emailVerified) {
+      if (user) {
         const profile = await getUserProfile(user.uid)
         if (profile) {
           setUserProfile(profile)
           setUserName(`${profile.firstName} ${profile.lastName}`)
-          setUserCurrency(profile.currency.split(" - ")[0])
-          setUserCountry(profile.country)
           setIsAuthenticated(true)
-
-          const hasSeenWelcome = localStorage.getItem(`welcome_shown_${user.uid}`)
-          if (!hasSeenWelcome) {
-            setShowWelcomeModal(true)
-            localStorage.setItem(`welcome_shown_${user.uid}`, "true")
-          }
         }
       } else {
         setIsAuthenticated(false)
@@ -64,8 +52,6 @@ export default function TradingDashboard() {
   const handleLogin = (profile: UserProfile) => {
     setUserProfile(profile)
     setUserName(`${profile.firstName} ${profile.lastName}`)
-    setUserCurrency(profile.currency.split(" - ")[0])
-    setUserCountry(profile.country)
     setIsAuthenticated(true)
   }
 
@@ -119,7 +105,6 @@ export default function TradingDashboard() {
 
   return (
     <div className="bg-slate-950 min-h-screen font-sans text-white pb-20">
-      {showWelcomeModal && <WelcomeModal userName={userName} onClose={() => setShowWelcomeModal(false)} />}
       <TopBar
         onMenuClick={() => setIsMenuOpen(true)}
         userName={userName}
