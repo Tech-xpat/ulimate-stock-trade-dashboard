@@ -12,6 +12,54 @@ interface DepositViewProps {
   username: string
 }
 
+function TypingText({ text, duration = 3000, className = "" }: { text: string; duration?: number; className?: string }) {
+  const [visible, setVisible] = useState("")
+  const [cursorOn, setCursorOn] = useState(true)
+  const [completed, setCompleted] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    setVisible("")
+    setCompleted(false)
+
+    const total = Math.max(1, text.length)
+    const interval = Math.max(10, Math.floor(duration / total))
+    let i = 0
+    const typer = setInterval(() => {
+      if (!mounted) return
+      i += 1
+      setVisible(text.slice(0, i))
+      if (i >= total) {
+        clearInterval(typer)
+        setCompleted(true)
+      }
+    }, interval)
+
+    const cursorTimer = setInterval(() => {
+      if (!mounted) return
+      setCursorOn((v) => !v)
+    }, 500)
+
+    return () => {
+      mounted = false
+      clearInterval(typer)
+      clearInterval(cursorTimer)
+    }
+  }, [text, duration])
+
+  // small "pop" when completed
+  const transformStyle = completed ? { transform: "scale(1.04)", transition: "transform 220ms ease-out", textShadow: "0 6px 18px rgba(34,197,94,0.12)" } : {}
+
+  return (
+    <span className={className} style={{ display: "inline-block", ...transformStyle }}>
+      <span style={{ fontWeight: 600, letterSpacing: 0.5, textTransform: "capitalize" }}>{visible}</span>
+      <span style={{ display: "inline-block", width: 10, marginLeft: 6, opacity: cursorOn ? 1 : 0 }} aria-hidden>
+        |
+      </span>
+    </span>
+  )
+}
+
 export function DepositView({ userId, username }: DepositViewProps) {
   const [step, setStep] = useState<"amount" | "payment">("amount")
   const [amount, setAmount] = useState("")
@@ -234,7 +282,9 @@ export function DepositView({ userId, username }: DepositViewProps) {
               {/* Wallet status / retry */}
               <div className="space-y-2">
                 {isLoadingWallet ? (
-                  <p className="text-xs text-slate-400">Loading deposit wallet...</p>
+                  <div className="flex items-center gap-3">
+                    <TypingText text="generating your wallet address" duration={3000} className="text-sm text-emerald-400" />
+                  </div>
                 ) : walletError ? (
                   <div className="flex items-center gap-3">
                     <p className="text-xs text-red-300">{walletError}</p>
@@ -402,10 +452,8 @@ export function DepositView({ userId, username }: DepositViewProps) {
                   <p className="font-semibold mb-1">Important:</p>
                   <ul className="space-y-1 text-xs">
                     <li>• Send only {selectedCrypto} to this address</li>
-                    <li>• Include the tag/memo in your transaction</li>
                     <li>• Upload a clear screenshot of your payment</li>
-                    <li>• Admin will review and approve your deposit</li>
-                    <li>• Your account will be credited after admin approval</li>
+                    <li>• Your account will be credited after approval</li>
                   </ul>
                 </div>
               </div>
@@ -421,7 +469,7 @@ export function DepositView({ userId, username }: DepositViewProps) {
           <div>
             <h3 className="text-xl font-bold text-emerald-400 mb-2">Deposit Submitted!</h3>
             <p className="text-slate-300 text-sm">
-              Your deposit request has been received and is pending admin approval. You will be notified once your
+              Your deposit request has been received and is pending approval. You will be notified once your
               account is credited.
             </p>
           </div>
