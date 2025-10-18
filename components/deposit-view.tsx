@@ -1,3 +1,4 @@
+// ...existing code...
 "use client"
 
 import type React from "react"
@@ -22,11 +23,62 @@ export function DepositView({ userId, username }: DepositViewProps) {
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
+  // new states
+  const [isLoadingWallet, setIsLoadingWallet] = useState(false)
+  const [walletError, setWalletError] = useState<string | null>(null)
+
   useEffect(() => {
     const fetchWalletSettings = async () => {
-      const settings = await getAdminWalletSettings()
-      setWalletSettings(settings)
+      setIsLoadingWallet(true)
+      setWalletError(null)
+      try {
+        const settings = await getAdminWalletSettings()
+        // normalize common key names returned by admin service
+        if (settings) {
+          const normalized: Partial<AdminWalletSettings> = {
+            btcAddress:
+              // prefer camelCase, fallback to snake_case or nested
+              (settings as any).btcAddress ||
+              (settings as any).btc_address ||
+              (settings as any).btc?.address ||
+              (settings as any).btc ||
+              null,
+            btcTag:
+              (settings as any).btcTag ||
+              (settings as any).btc_tag ||
+              (settings as any).btc?.tag ||
+              (settings as any).btcMemo ||
+              (settings as any).btc_memo ||
+              null,
+            usdtAddress:
+              (settings as any).usdtAddress ||
+              (settings as any).usdt_address ||
+              (settings as any).usdt?.address ||
+              (settings as any).usdt ||
+              null,
+            usdtTag:
+              (settings as any).usdtTag ||
+              (settings as any).usdt_tag ||
+              (settings as any).usdt?.tag ||
+              (settings as any).usdtMemo ||
+              (settings as any).usdt_memo ||
+              null,
+          }
+          setWalletSettings(normalized as AdminWalletSettings)
+        } else {
+          setWalletSettings(null)
+          setWalletError("No wallet settings returned from server.")
+          console.warn("getAdminWalletSettings returned null/undefined")
+        }
+      } catch (err) {
+        console.error("Failed to fetch admin wallet settings:", err)
+        setWalletSettings(null)
+        setWalletError("Failed to load wallet settings. Try again.")
+      } finally {
+        setIsLoadingWallet(false)
+      }
     }
+
     fetchWalletSettings()
   }, [])
 
@@ -37,8 +89,26 @@ export function DepositView({ userId, username }: DepositViewProps) {
   }
 
   const handleProceedToPayment = () => {
-    if (Number.parseFloat(amount) >= 50) {
+    const parsed = Number.parseFloat(amount || "0")
+    const walletAddress = selectedCrypto === "BTC" ? walletSettings?.btcAddress : walletSettings?.usdtAddress
+    const tag = selectedCrypto === "BTC" ? walletSettings?.btcTag : walletSettings?.usdtTag
+
+    if (parsed >= 50 && walletAddress) {
+      // if tag is required for this currency ensure it's present
+      const needsTag = !!tag // previous UX expects tag displayed; still allow proceed if address present but warn
+      if (!needsTag) {
+        // proceed but warn in console; admin may not require tag
+        console.warn("Proceeding without tag/memo for", selectedCrypto)
+      }
       setStep("payment")
+    } else {
+      // keep UX simple: block if amount too low or address missing
+      if (parsed < 50) {
+        console.warn("Deposit amount below minimum:", parsed)
+      }
+      if (!walletAddress) {
+        setWalletError("Deposit wallet address not configured by admin.")
+      }
     }
   }
 
@@ -89,6 +159,7 @@ export function DepositView({ userId, username }: DepositViewProps) {
     }
   }
 
+  // use normalized accessors
   const walletAddress = selectedCrypto === "BTC" ? walletSettings?.btcAddress : walletSettings?.usdtAddress
   const tag = selectedCrypto === "BTC" ? walletSettings?.btcTag : walletSettings?.usdtTag
 
@@ -160,10 +231,81 @@ export function DepositView({ userId, username }: DepositViewProps) {
                 </div>
               </div>
 
+              {/* Wallet status / retry */}
+              <div className="space-y-2">
+                {isLoadingWallet ? (
+                  <p className="text-xs text-slate-400">Loading deposit wallet...</p>
+                ) : walletError ? (
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs text-red-300">{walletError}</p>
+                    <button
+                      onClick={() => {
+                        setWalletError(null)
+                        setIsLoadingWallet(true)
+                        // re-run effect by calling getAdminWalletSettings directly
+                        getAdminWalletSettings()
+                          .then((s) => {
+                            // same normalization as above
+                            const normalized: Partial<AdminWalletSettings> = {
+                              btcAddress:
+                                (s as any).btcAddress ||
+                                (s as any).btc_address ||
+                                (s as any).btc?.address ||
+                                (s as any).btc ||
+                                null,
+                              btcTag:
+                                (s as any).btcTag ||
+                                (s as any).btc_tag ||
+                                (s as any).btc?.tag ||
+                                (s as any).btcMemo ||
+                                (s as any).btc_memo ||
+                                null,
+                              usdtAddress:
+                                (s as any).usdtAddress ||
+                                (s as any).usdt_address ||
+                                (s as any).usdt?.address ||
+                                (s as any).usdt ||
+                                null,
+                              usdtTag:
+                                (s as any).usdtTag ||
+                                (s as any).usdt_tag ||
+                                (s as any).usdt?.tag ||
+                                (s as any).usdtMemo ||
+                                (s as any).usdt_memo ||
+                                null,
+                            }
+                            setWalletSettings(normalized as AdminWalletSettings)
+                            setWalletError(null)
+                          })
+                          .catch((err) => {
+                            console.error("Retry getAdminWalletSettings failed:", err)
+                            setWalletError("Retry failed. Check server.")
+                          })
+                          .finally(() => setIsLoadingWallet(false))
+                      }}
+                      className="text-xs text-emerald-400 hover:text-emerald-300"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : !walletSettings ? (
+                  <p className="text-xs text-red-300">No wallet settings available.</p>
+                ) : (
+                  <p className="text-xs text-slate-400">Deposit address loaded</p>
+                )}
+              </div>
+
               {/* Proceed Button */}
               <button
                 onClick={handleProceedToPayment}
-                disabled={!amount || Number.parseFloat(amount) < 50 || !walletSettings}
+                disabled={
+                  !amount ||
+                  Number.parseFloat(amount || "0") < 50 ||
+                  isLoadingWallet ||
+                  !walletSettings ||
+                  // also disable if selected currency has no address
+                  !(selectedCrypto === "BTC" ? walletSettings?.btcAddress : walletSettings?.usdtAddress)
+                }
                 className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-4 rounded-xl transition-all duration-300 transform active:scale-95"
               >
                 {!walletSettings ? "Loading wallet..." : "Proceed to Payment"}
@@ -183,7 +325,7 @@ export function DepositView({ userId, username }: DepositViewProps) {
               </div>
 
               {/* Wallet Address */}
-              {walletAddress && tag ? (
+              {walletAddress ? (
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
                   <div>
                     <label className="text-sm text-slate-400 mb-2 block">Wallet Address</label>
@@ -201,10 +343,11 @@ export function DepositView({ userId, username }: DepositViewProps) {
                   <div>
                     <label className="text-sm text-slate-400 mb-2 block">Tag/Memo</label>
                     <div className="bg-slate-950 border border-slate-700 rounded-xl p-4 flex items-center justify-between gap-3">
-                      <p className="text-sm font-mono">{tag}</p>
+                      <p className="text-sm font-mono">{tag ?? "-"}</p>
                       <button
-                        onClick={() => copyToClipboard(tag, "tag")}
-                        className="flex-shrink-0 p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors"
+                        onClick={() => tag && copyToClipboard(tag, "tag")}
+                        disabled={!tag}
+                        className="flex-shrink-0 p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors disabled:opacity-60"
                       >
                         {copiedTag ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                       </button>
@@ -298,3 +441,4 @@ export function DepositView({ userId, username }: DepositViewProps) {
     </div>
   )
 }
+// ...existing code...
