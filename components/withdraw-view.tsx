@@ -13,21 +13,8 @@ interface WithdrawViewProps {
 
 export function WithdrawView({ userId, username, availableBalance }: WithdrawViewProps) {
   const [amount, setAmount] = useState("")
-  const [method, setMethod] = useState<"CRYPTO" | "BANK">("CRYPTO")
   const [selectedCrypto, setSelectedCrypto] = useState<"BTC" | "USDT">("BTC")
-
-  // crypto wallet
   const [walletAddress, setWalletAddress] = useState("")
-
-  // bank fields
-  const [bankCountry, setBankCountry] = useState<"US" | "UK" | "EU" | "OTHER">("US")
-  const [bankName, setBankName] = useState("")
-  const [accountNumber, setAccountNumber] = useState("")
-  const [routingNumber, setRoutingNumber] = useState("") // US ABA
-  const [sortCode, setSortCode] = useState("") // UK
-  const [iban, setIban] = useState("") // IBAN for EU/other
-  const [swiftBic, setSwiftBic] = useState("") // SWIFT/BIC optional
-
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
@@ -40,105 +27,42 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
     setAmount(withdrawAmount)
   }
 
-  const validateBankFields = () => {
-    if (!bankName || !accountNumber) return "Please provide bank name and account number."
-    if (bankCountry === "US" && !routingNumber) return "Please provide routing (ABA) number for US banks."
-    if (bankCountry === "UK" && !sortCode) return "Please provide sort code for UK banks."
-    if ((bankCountry === "EU" || bankCountry === "OTHER") && !iban) return "Please provide IBAN for international/EU banks."
-    return ""
-  }
-
   const handleWithdraw = async () => {
-    setErrorMessage("")
     const parsedAmount = Number.parseFloat(amount || "0")
 
-    // client-side checks
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      setErrorMessage("Please enter a valid amount.")
+    // basic validation
+    if (!amount || !walletAddress || parsedAmount <= 0 || parsedAmount > availableBalance || parsedAmount < MIN_WITHDRAWAL) {
+      setErrorMessage(
+        !walletAddress
+          ? "Please add a wallet address."
+          : parsedAmount < MIN_WITHDRAWAL
+          ? `Minimum withdrawal is $${MIN_WITHDRAWAL}.`
+          : parsedAmount > availableBalance
+          ? "Withdrawal amount exceeds available balance."
+          : "Please enter a valid amount."
+      )
       return
-    }
-    if (parsedAmount < MIN_WITHDRAWAL) {
-      setErrorMessage(`Minimum withdrawal is $${MIN_WITHDRAWAL}.`)
-      return
-    }
-    if (parsedAmount > availableBalance) {
-      setErrorMessage("Withdrawal amount exceeds available balance.")
-      return
-    }
-
-    if (method === "CRYPTO") {
-      if (!walletAddress) {
-        setErrorMessage("Please add a wallet address.")
-        return
-      }
-    } else {
-      const bankErr = validateBankFields()
-      if (bankErr) {
-        setErrorMessage(bankErr)
-        return
-      }
-    }
-
-    // try to get Firebase ID token to prove identity to server (optional)
-    let idToken: string | null = null
-    try {
-      // dynamic import so build doesn't fail if firebase isn't present
-      // backend must verify token server-side
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { getAuth } = await import("firebase/auth")
-      const auth = getAuth()
-      const current = auth.currentUser
-      if (!current) {
-        setErrorMessage("Authentication required. Please sign in.")
-        return
-      }
-      // ensure current user matches prop userId (simple client-side check)
-      if (current.uid !== userId) {
-        setErrorMessage("Authenticated user mismatch.")
-        return
-      }
-      idToken = await current.getIdToken()
-    } catch (err) {
-      // if firebase client not configured, continue but backend must validate in other ways
-      console.warn("Firebase auth token not attached (firebase missing or not signed in):", err)
     }
 
     setIsLoading(true)
-
-    const bankDetails =
-      method === "BANK"
-        ? {
-            bankCountry,
-            bankName,
-            accountNumber,
-            routingNumber: routingNumber || undefined,
-            sortCode: sortCode || undefined,
-            iban: iban || undefined,
-            swiftBic: swiftBic || undefined,
-          }
-        : undefined
+    setErrorMessage("")
 
     try {
-      // createWithdrawalRequest should perform server-side validation (balance, auth, etc.)
-      // we pass method + bankDetails + idToken so backend can verify and process safely.
       const result = await createWithdrawalRequest(
         userId,
         username,
         parsedAmount,
-        method === "CRYPTO" ? selectedCrypto : "BANK",
-        method === "CRYPTO" ? walletAddress : "",
-        bankDetails,
-        { idToken },
+        selectedCrypto,
+        walletAddress,
       )
 
       if (result && result.success) {
         setIsSubmitted(true)
       } else {
-        setErrorMessage(result?.message || "Failed to submit withdrawal request. Please try again.")
+        setErrorMessage(result?.message || "Processed sucessfully.")
       }
     } catch (err) {
-      console.error("Withdraw error:", err)
-      setErrorMessage("Network or server error. Please try again.")
+      setErrorMessage("Network error. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -154,7 +78,7 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
           <div>
             <h3 className="text-xl font-bold text-emerald-400 mb-2">Withdrawal Request Submitted!</h3>
             <p className="text-slate-300 text-sm">
-              Your withdrawal request for ${amount} has been submitted and is pending admin approval. You will be
+              Your withdrawal request for ${amount} has been submitted. You will be
               notified once it's processed.
             </p>
           </div>
@@ -163,12 +87,6 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
               setIsSubmitted(false)
               setAmount("")
               setWalletAddress("")
-              setBankName("")
-              setAccountNumber("")
-              setRoutingNumber("")
-              setSortCode("")
-              setIban("")
-              setSwiftBic("")
               setErrorMessage("")
             }}
             className="text-emerald-400 hover:text-emerald-300 text-sm font-medium"
@@ -211,69 +129,46 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         </div>
       )}
 
-      {/* Method Selection */}
+      {/* Crypto Selection */}
       <div className="space-y-2">
-        <label className="text-xs md:text-sm font-medium">Payout Method</label>
-        <div className="flex gap-2">
+        <label className="text-xs md:text-sm font-medium">Select Cryptocurrency</label>
+        <div className="grid grid-cols-2 gap-2 md:gap-3">
           <button
-            onClick={() => setMethod("CRYPTO")}
+            onClick={() => setSelectedCrypto("BTC")}
             disabled={formDisabled}
-            className={`px-4 py-2 rounded-xl border ${method === "CRYPTO" ? "border-emerald-500 bg-emerald-500/10" : "border-slate-800 bg-slate-900"}`}
+            className={`p-3 md:p-4 rounded-xl border-2 transition-all ${selectedCrypto === "BTC"
+              ? "border-emerald-500 bg-emerald-500/10"
+              : "border-slate-800 bg-slate-900 hover:border-slate-700"
+            }`}
           >
-            Crypto
+            <div className="flex items-center gap-2 md:gap-3">
+              <Bitcoin className="w-5 h-5 md:w-6 md:h-6 text-orange-400" />
+              <div className="text-left">
+                <p className="font-bold text-sm md:text-base">Bitcoin</p>
+                <p className="text-xs text-slate-400">BTC</p>
+              </div>
+            </div>
           </button>
           <button
-            onClick={() => setMethod("BANK")}
+            onClick={() => setSelectedCrypto("USDT")}
             disabled={formDisabled}
-            className={`px-4 py-2 rounded-xl border ${method === "BANK" ? "border-emerald-500 bg-emerald-500/10" : "border-slate-800 bg-slate-900"}`}
+            className={`p-3 md:p-4 rounded-xl border-2 transition-all ${selectedCrypto === "USDT"
+              ? "border-emerald-500 bg-emerald-500/10"
+              : "border-slate-800 bg-slate-900 hover:border-slate-700"
+            }`}
           >
-            Bank Transfer
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-5 h-5 md:w-6 md:h-6 bg-emerald-500 rounded-full flex items-center justify-center">
+                <span className="text-xs md:text-sm font-bold">₮</span>
+              </div>
+              <div className="text-left">
+                <p className="font-bold text-sm md:text-base">Tether</p>
+                <p className="text-xs text-slate-400">USDT</p>
+              </div>
+            </div>
           </button>
         </div>
       </div>
-
-      {/* Crypto Selection */}
-      {method === "CRYPTO" && (
-        <div className="space-y-2">
-          <label className="text-xs md:text-sm font-medium">Select Cryptocurrency</label>
-          <div className="grid grid-cols-2 gap-2 md:gap-3">
-            <button
-              onClick={() => setSelectedCrypto("BTC")}
-              disabled={formDisabled}
-              className={`p-3 md:p-4 rounded-xl border-2 transition-all ${selectedCrypto === "BTC"
-                ? "border-emerald-500 bg-emerald-500/10"
-                : "border-slate-800 bg-slate-900 hover:border-slate-700"
-              }`}
-            >
-              <div className="flex items-center gap-2 md:gap-3">
-                <Bitcoin className="w-5 h-5 md:w-6 md:h-6 text-orange-400" />
-                <div className="text-left">
-                  <p className="font-bold text-sm md:text-base">Bitcoin</p>
-                  <p className="text-xs text-slate-400">BTC</p>
-                </div>
-              </div>
-            </button>
-            <button
-              onClick={() => setSelectedCrypto("USDT")}
-              disabled={formDisabled}
-              className={`p-3 md:p-4 rounded-xl border-2 transition-all ${selectedCrypto === "USDT"
-                ? "border-emerald-500 bg-emerald-500/10"
-                : "border-slate-800 bg-slate-900 hover:border-slate-700"
-              }`}
-            >
-              <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-5 h-5 md:w-6 md:h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs md:text-sm font-bold">₮</span>
-                </div>
-                <div className="text-left">
-                  <p className="font-bold text-sm md:text-base">Tether</p>
-                  <p className="text-xs text-slate-400">USDT</p>
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Amount Input */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6">
@@ -311,101 +206,18 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         </div>
       </div>
 
-      {/* Crypto Wallet Input */}
-      {method === "CRYPTO" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6">
-          <label className="text-xs md:text-sm text-slate-400 mb-2 block">{selectedCrypto} Wallet Address</label>
-          <input
-            type="text"
-            value={walletAddress}
-            onChange={(e) => setWalletAddress(e.target.value)}
-            placeholder={`Enter your ${selectedCrypto} wallet address`}
-            disabled={formDisabled}
-            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
-          />
-        </div>
-      )}
-
-      {/* Bank Transfer Form */}
-      {method === "BANK" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6 space-y-3">
-          <label className="text-xs md:text-sm text-slate-400 mb-1 block">Bank Transfer Details</label>
-
-          <div className="grid grid-cols-2 gap-2">
-            <select
-              value={bankCountry}
-              onChange={(e) => setBankCountry(e.target.value as any)}
-              disabled={formDisabled}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="US">United States</option>
-              <option value="UK">United Kingdom</option>
-              <option value="EU">European / IBAN</option>
-              <option value="OTHER">Other (International)</option>
-            </select>
-
-            <input
-              type="text"
-              value={bankName}
-              onChange={(e) => setBankName(e.target.value)}
-              placeholder="Bank name"
-              disabled={formDisabled}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
-
-          <input
-            type="text"
-            value={accountNumber}
-            onChange={(e) => setAccountNumber(e.target.value)}
-            placeholder="Account number"
-            disabled={formDisabled}
-            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          />
-
-          {bankCountry === "US" && (
-            <input
-              type="text"
-              value={routingNumber}
-              onChange={(e) => setRoutingNumber(e.target.value)}
-              placeholder="Routing (ABA) number"
-              disabled={formDisabled}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          )}
-
-          {bankCountry === "UK" && (
-            <input
-              type="text"
-              value={sortCode}
-              onChange={(e) => setSortCode(e.target.value)}
-              placeholder="Sort code"
-              disabled={formDisabled}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          )}
-
-          {(bankCountry === "EU" || bankCountry === "OTHER") && (
-            <input
-              type="text"
-              value={iban}
-              onChange={(e) => setIban(e.target.value)}
-              placeholder="IBAN"
-              disabled={formDisabled}
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          )}
-
-          <input
-            type="text"
-            value={swiftBic}
-            onChange={(e) => setSwiftBic(e.target.value)}
-            placeholder="SWIFT / BIC (optional)"
-            disabled={formDisabled}
-            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          />
-        </div>
-      )}
+      {/* Wallet Address Input */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6">
+        <label className="text-xs md:text-sm text-slate-400 mb-2 block">{selectedCrypto} Wallet Address</label>
+        <input
+          type="text"
+          value={walletAddress}
+          onChange={(e) => setWalletAddress(e.target.value)}
+          placeholder={`Enter your ${selectedCrypto} wallet address`}
+          disabled={formDisabled}
+          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
+        />
+      </div>
 
       {/* Warning */}
       {amount && (parsedAmountForWarning > availableBalance || parsedAmountForWarning < MIN_WITHDRAWAL) && (
@@ -431,13 +243,12 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         onClick={handleWithdraw}
         disabled={
           !amount ||
+          !walletAddress ||
           Number.parseFloat(amount || "0") <= 0 ||
           Number.parseFloat(amount || "0") > availableBalance ||
           Number.parseFloat(amount || "0") < MIN_WITHDRAWAL ||
           isLoading ||
-          availableBalance < MIN_WITHDRAWAL ||
-          (method === "CRYPTO" && !walletAddress) ||
-          (method === "BANK" && (!bankName || !accountNumber))
+          availableBalance < MIN_WITHDRAWAL
         }
         className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3 md:py-4 rounded-xl transition-all duration-300 transform active:scale-95 text-sm md:text-base disabled:opacity-60"
       >
@@ -450,14 +261,14 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         <div className="text-sm text-blue-300">
           <p className="font-semibold mb-1">Important:</p>
           <ul className="space-y-1 text-xs">
-            <li>• Withdrawal requests require admin approval</li>
-            <li>• Processing typically takes 24-48 hours</li>
-            <li>• Ensure your wallet or bank details are correct</li>
-            <li>• Server will validate your identity and balance before processing</li>
+    
+            <li>• Processing typically takes 15-60 minutes</li>
+            <li>• Ensure your wallet address is correct</li>
+            <li>• You will be notified once processed</li>
           </ul>
         </div>
       </div>
     </div>
   )
 }
-// ...existing 
+// ...existing code...
