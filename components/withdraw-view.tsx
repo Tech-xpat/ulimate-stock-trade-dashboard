@@ -1,7 +1,7 @@
 // ...existing code...
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
 import { Bitcoin, Wallet, AlertCircle, Check } from "lucide-react"
 import { createWithdrawalRequest } from "@/lib/admin-service"
 
@@ -113,7 +113,7 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         <div className="flex items-center justify-between">
           <div>
             <p className="text-slate-400 text-xs md:text-sm mb-1">Available Balance</p>
-            <p className="text-2xl md:text-3xl font-bold">${availableBalance.toFixed(2)}</p>
+            <p className="text-2xl md:text-3xl font-bold">${availableBalance?.toFixed(2)}</p>
           </div>
           <Wallet className="w-8 h-8 md:w-10 md:h-10 text-slate-600" />
         </div>
@@ -261,8 +261,8 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         <div className="text-sm text-blue-300">
           <p className="font-semibold mb-1">Important:</p>
           <ul className="space-y-1 text-xs">
-            <li>• Withdrawal requests require admin approval</li>
-            <li>• Processing typically takes 24-48 hours</li>
+    
+            <li>• Processing typically takes 15-60 minutes</li>
             <li>• Ensure your wallet address is correct</li>
             <li>• You will be notified once processed</li>
           </ul>
