@@ -1,3 +1,4 @@
+// ...existing code...
 "use client"
 
 import { useState } from "react"
@@ -16,7 +17,9 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
   const [walletAddress, setWalletAddress] = useState("")
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
 
+  const MIN_WITHDRAWAL = 100
   const quickPercentages = [25, 50, 75, 100]
 
   const handlePercentage = (percentage: number) => {
@@ -25,31 +28,44 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
   }
 
   const handleWithdraw = async () => {
-    if (
-      !amount ||
-      !walletAddress ||
-      Number.parseFloat(amount) <= 0 ||
-      Number.parseFloat(amount) > availableBalance ||
-      Number.parseFloat(amount) < 500
-    ) {
+    const parsedAmount = Number.parseFloat(amount || "0")
+
+    // basic validation
+    if (!amount || !walletAddress || parsedAmount <= 0 || parsedAmount > availableBalance || parsedAmount < MIN_WITHDRAWAL) {
+      setErrorMessage(
+        !walletAddress
+          ? "Please add a wallet address."
+          : parsedAmount < MIN_WITHDRAWAL
+          ? `Minimum withdrawal is $${MIN_WITHDRAWAL}.`
+          : parsedAmount > availableBalance
+          ? "Withdrawal amount exceeds available balance."
+          : "Please enter a valid amount."
+      )
       return
     }
 
     setIsLoading(true)
-    const result = await createWithdrawalRequest(
-      userId,
-      username,
-      Number.parseFloat(amount),
-      selectedCrypto,
-      walletAddress,
-    )
+    setErrorMessage("")
 
-    if (result.success) {
-      setIsSubmitted(true)
-    } else {
-      alert("Failed to submit withdrawal request. Please try again.")
+    try {
+      const result = await createWithdrawalRequest(
+        userId,
+        username,
+        parsedAmount,
+        selectedCrypto,
+        walletAddress,
+      )
+
+      if (result && result.success) {
+        setIsSubmitted(true)
+      } else {
+        setErrorMessage(result?.message || "Failed to submit withdrawal request. Please try again.")
+      }
+    } catch (err) {
+      setErrorMessage("Network error. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   if (isSubmitted) {
@@ -71,6 +87,7 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
               setIsSubmitted(false)
               setAmount("")
               setWalletAddress("")
+              setErrorMessage("")
             }}
             className="text-emerald-400 hover:text-emerald-300 text-sm font-medium"
           >
@@ -80,6 +97,9 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
       </div>
     )
   }
+
+  const parsedAmountForWarning = Number.parseFloat(amount || "0")
+  const formDisabled = isLoading || availableBalance < MIN_WITHDRAWAL
 
   return (
     <div className="max-w-2xl mx-auto space-y-4 md:space-y-6 pb-6">
@@ -99,16 +119,26 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         </div>
       </div>
 
+      {/* Balance too low notice */}
+      {availableBalance < MIN_WITHDRAWAL && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 md:p-4 flex items-start gap-2 md:gap-3">
+          <AlertCircle className="w-4 h-4 md:w-5 md:h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs md:text-sm text-yellow-300">
+            Your available balance is below the minimum withdrawal amount of ${MIN_WITHDRAWAL}. Add funds to withdraw.
+          </p>
+        </div>
+      )}
+
       {/* Crypto Selection */}
       <div className="space-y-2">
         <label className="text-xs md:text-sm font-medium">Select Cryptocurrency</label>
         <div className="grid grid-cols-2 gap-2 md:gap-3">
           <button
             onClick={() => setSelectedCrypto("BTC")}
-            className={`p-3 md:p-4 rounded-xl border-2 transition-all ${
-              selectedCrypto === "BTC"
-                ? "border-emerald-500 bg-emerald-500/10"
-                : "border-slate-800 bg-slate-900 hover:border-slate-700"
+            disabled={formDisabled}
+            className={`p-3 md:p-4 rounded-xl border-2 transition-all ${selectedCrypto === "BTC"
+              ? "border-emerald-500 bg-emerald-500/10"
+              : "border-slate-800 bg-slate-900 hover:border-slate-700"
             }`}
           >
             <div className="flex items-center gap-2 md:gap-3">
@@ -121,10 +151,10 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
           </button>
           <button
             onClick={() => setSelectedCrypto("USDT")}
-            className={`p-3 md:p-4 rounded-xl border-2 transition-all ${
-              selectedCrypto === "USDT"
-                ? "border-emerald-500 bg-emerald-500/10"
-                : "border-slate-800 bg-slate-900 hover:border-slate-700"
+            disabled={formDisabled}
+            className={`p-3 md:p-4 rounded-xl border-2 transition-all ${selectedCrypto === "USDT"
+              ? "border-emerald-500 bg-emerald-500/10"
+              : "border-slate-800 bg-slate-900 hover:border-slate-700"
             }`}
           >
             <div className="flex items-center gap-2 md:gap-3">
@@ -143,19 +173,21 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
       {/* Amount Input */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6">
         <label className="text-xs md:text-sm text-slate-400 mb-2 block">Withdrawal Amount (USD)</label>
-        <p className="text-xs text-amber-400 mb-3">Minimum withdrawal: $500</p>
+        <p className="text-xs text-amber-400 mb-3">Minimum withdrawal: ${MIN_WITHDRAWAL}</p>
         <div className="relative mb-3 md:mb-4">
           <span className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-xl md:text-2xl font-bold text-slate-400">
             $
           </span>
           <input
             type="number"
+            step="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            min="500"
+            min={MIN_WITHDRAWAL}
             max={availableBalance}
-            className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 md:pl-10 pr-4 py-3 md:py-4 text-2xl md:text-3xl font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            disabled={formDisabled}
+            className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 md:pl-10 pr-4 py-3 md:py-4 text-2xl md:text-3xl font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
           />
         </div>
 
@@ -165,7 +197,8 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
             <button
               key={percentage}
               onClick={() => handlePercentage(percentage)}
-              className="bg-slate-800 hover:bg-slate-700 rounded-lg py-2 text-xs md:text-sm font-medium transition-colors active:scale-95"
+              disabled={formDisabled}
+              className="bg-slate-800 hover:bg-slate-700 rounded-lg py-2 text-xs md:text-sm font-medium transition-colors active:scale-95 disabled:opacity-60"
             >
               {percentage}%
             </button>
@@ -181,19 +214,27 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
           value={walletAddress}
           onChange={(e) => setWalletAddress(e.target.value)}
           placeholder={`Enter your ${selectedCrypto} wallet address`}
-          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          disabled={formDisabled}
+          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
         />
       </div>
 
       {/* Warning */}
-      {(Number.parseFloat(amount) > availableBalance || Number.parseFloat(amount) < 500) && (
+      {amount && (parsedAmountForWarning > availableBalance || parsedAmountForWarning < MIN_WITHDRAWAL) && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 md:p-4 flex items-start gap-2 md:gap-3">
           <AlertCircle className="w-4 h-4 md:w-5 md:h-5 text-red-400 flex-shrink-0 mt-0.5" />
           <p className="text-xs md:text-sm text-red-300">
-            {Number.parseFloat(amount) > availableBalance
+            {parsedAmountForWarning > availableBalance
               ? "Withdrawal amount exceeds available balance"
-              : "Minimum withdrawal amount is $500"}
+              : `Minimum withdrawal amount is $${MIN_WITHDRAWAL}`}
           </p>
+        </div>
+      )}
+
+      {/* Inline error message */}
+      {errorMessage && (
+        <div className="bg-red-600/10 border border-red-600/20 rounded-xl p-3 md:p-4 text-sm text-red-300">
+          {errorMessage}
         </div>
       )}
 
@@ -203,12 +244,13 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         disabled={
           !amount ||
           !walletAddress ||
-          Number.parseFloat(amount) <= 0 ||
-          Number.parseFloat(amount) > availableBalance ||
-          Number.parseFloat(amount) < 500 ||
-          isLoading
+          Number.parseFloat(amount || "0") <= 0 ||
+          Number.parseFloat(amount || "0") > availableBalance ||
+          Number.parseFloat(amount || "0") < MIN_WITHDRAWAL ||
+          isLoading ||
+          availableBalance < MIN_WITHDRAWAL
         }
-        className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3 md:py-4 rounded-xl transition-all duration-300 transform active:scale-95 text-sm md:text-base"
+        className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3 md:py-4 rounded-xl transition-all duration-300 transform active:scale-95 text-sm md:text-base disabled:opacity-60"
       >
         {isLoading ? "Submitting..." : `Request Withdrawal $${amount || "0.00"}`}
       </button>
@@ -229,3 +271,4 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
     </div>
   )
 }
+// ...existing code...
