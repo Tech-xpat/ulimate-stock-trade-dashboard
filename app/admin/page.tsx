@@ -78,7 +78,7 @@ export default function AdminPage() {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <div className="bg-slate-900 border border-amber-500/20 rounded-lg p-8 max-w-md w-full text-center">
           <img
-            src="https://i.ibb.co/pBSBnW9y/Whats-App-Image-2025-10-10-at-8-45-37-AM-1-removebg-preview-1.png"
+            src="/images/design-mode/Whats-App-Image-2025-10-10-at-8-45-37-AM-1-removebg-preview-1.png"
             alt="UltimateStckTrader Logo"
             className="w-32 h-32 mx-auto mb-6 object-contain"
           />

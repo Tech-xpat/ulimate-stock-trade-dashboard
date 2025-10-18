@@ -18,6 +18,9 @@ export interface UserProfile {
   currency: string
   country: string
   balance: number
+  profitBalance: number
+  kycDocuments: string[]
+  kycStatus: "pending" | "approved" | "rejected"
   createdAt: string
   emailVerified: boolean
 }
@@ -35,12 +38,18 @@ export interface Transaction {
 // Create user profile in Firestore
 export async function createUserProfile(
   user: User,
-  profileData: Omit<UserProfile, "uid" | "createdAt" | "emailVerified">,
+  profileData: Omit<
+    UserProfile,
+    "uid" | "createdAt" | "emailVerified" | "profitBalance" | "kycDocuments" | "kycStatus"
+  >,
 ) {
   const userProfile: UserProfile = {
     uid: user.uid,
     ...profileData,
-    balance: 0, // Default balance is $0
+    balance: 0,
+    profitBalance: 0,
+    kycDocuments: [],
+    kycStatus: "pending",
     createdAt: new Date().toISOString(),
     emailVerified: user.emailVerified,
   }
@@ -64,7 +73,10 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 export async function signUpWithEmail(
   email: string,
   password: string,
-  profileData: Omit<UserProfile, "uid" | "email" | "balance" | "createdAt" | "emailVerified">,
+  profileData: Omit<
+    UserProfile,
+    "uid" | "email" | "balance" | "createdAt" | "emailVerified" | "profitBalance" | "kycDocuments" | "kycStatus"
+  >,
 ) {
   try {
     // Create user account
@@ -180,5 +192,46 @@ export async function getUserTransactions(uid: string): Promise<Transaction[]> {
   } catch (error) {
     console.error("[v0] Get transactions error:", error)
     return []
+  }
+}
+
+// Update both main and profit balance
+export async function updateUserBalances(uid: string, mainBalance?: number, profitBalance?: number) {
+  try {
+    const updateData: any = {}
+    if (mainBalance !== undefined) updateData.balance = mainBalance
+    if (profitBalance !== undefined) updateData.profitBalance = profitBalance
+
+    await setDoc(doc(db, "users", uid), updateData, { merge: true })
+    return { success: true }
+  } catch (error: any) {
+    console.error("[v0] Update balances error:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+// Update user profile fields
+export async function updateUserProfile(uid: string, updates: Partial<UserProfile>) {
+  try {
+    await setDoc(doc(db, "users", uid), updates, { merge: true })
+    return { success: true }
+  } catch (error: any) {
+    console.error("[v0] Update profile error:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+// Add KYC documents
+export async function addKYCDocument(uid: string, documentUrl: string) {
+  try {
+    const userProfile = await getUserProfile(uid)
+    if (!userProfile) return { success: false, error: "User not found" }
+
+    const updatedDocs = [...(userProfile.kycDocuments || []), documentUrl]
+    await setDoc(doc(db, "users", uid), { kycDocuments: updatedDocs }, { merge: true })
+    return { success: true }
+  } catch (error: any) {
+    console.error("[v0] Add KYC document error:", error)
+    return { success: false, error: error.message }
   }
 }

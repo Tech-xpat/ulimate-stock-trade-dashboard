@@ -3,12 +3,15 @@
 import { useState, useEffect } from "react"
 import { collection, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { updateUserBalances, updateUserProfile } from "@/lib/auth-service"
 import type { UserProfile } from "@/lib/auth-service"
 
 export function UsersManagement() {
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
+  const [editForm, setEditForm] = useState<Partial<UserProfile>>({})
 
   useEffect(() => {
     loadUsers()
@@ -29,6 +32,36 @@ export function UsersManagement() {
     }
   }
 
+  const handleEditUser = (user: UserProfile) => {
+    setEditingUser(user)
+    setEditForm(user)
+  }
+
+  const handleSaveUser = async () => {
+    if (!editingUser) return
+
+    const result = await updateUserProfile(editingUser.uid, editForm)
+    if (result.success) {
+      setUsers(users.map((u) => (u.uid === editingUser.uid ? { ...u, ...editForm } : u)))
+      setEditingUser(null)
+    }
+  }
+
+  const handleAddBalance = async (userId: string, type: "main" | "profit", amount: number) => {
+    const user = users.find((u) => u.uid === userId)
+    if (!user) return
+
+    const newMainBalance = type === "main" ? user.balance + amount : user.balance
+    const newProfitBalance = type === "profit" ? user.profitBalance + amount : user.profitBalance
+
+    const result = await updateUserBalances(userId, newMainBalance, newProfitBalance)
+    if (result.success) {
+      setUsers(
+        users.map((u) => (u.uid === userId ? { ...u, balance: newMainBalance, profitBalance: newProfitBalance } : u)),
+      )
+    }
+  }
+
   const filteredUsers = users.filter(
     (user) =>
       user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -41,6 +74,106 @@ export function UsersManagement() {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    )
+  }
+
+  if (editingUser) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-white">Edit User</h2>
+          <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-white">
+            ✕
+          </button>
+        </div>
+
+        <div className="bg-slate-900 rounded-lg border border-slate-800 p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-slate-400 mb-2 block">First Name</label>
+              <input
+                type="text"
+                value={editForm.firstName || ""}
+                onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-slate-400 mb-2 block">Last Name</label>
+              <input
+                type="text"
+                value={editForm.lastName || ""}
+                onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-slate-400 mb-2 block">Main Balance</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={editForm.balance || 0}
+                onChange={(e) => setEditForm({ ...editForm, balance: Number(e.target.value) })}
+                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+              />
+              <button
+                onClick={() => handleAddBalance(editingUser.uid, "main", 100)}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg"
+              >
+                +$100
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-slate-400 mb-2 block">Profit Balance</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={editForm.profitBalance || 0}
+                onChange={(e) => setEditForm({ ...editForm, profitBalance: Number(e.target.value) })}
+                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+              />
+              <button
+                onClick={() => handleAddBalance(editingUser.uid, "profit", 100)}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
+              >
+                +$100
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-slate-400 mb-2 block">KYC Status</label>
+            <select
+              value={editForm.kycStatus || "pending"}
+              onChange={(e) => setEditForm({ ...editForm, kycStatus: e.target.value as any })}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+            >
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveUser}
+              className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 rounded-lg"
+            >
+              Save Changes
+            </button>
+            <button
+              onClick={() => setEditingUser(null)}
+              className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 rounded-lg"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -68,10 +201,10 @@ export function UsersManagement() {
             <thead className="bg-slate-800">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">User</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Balance</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Country</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Joined</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Main Balance</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Profit Balance</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">KYC Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -85,21 +218,38 @@ export function UsersManagement() {
                       <p className="text-sm text-slate-400">@{user.username}</p>
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-slate-300">{user.email}</td>
                   <td className="px-4 py-4">
                     <span className="text-emerald-500 font-semibold">${user.balance.toLocaleString()}</span>
                   </td>
-                  <td className="px-4 py-4 text-slate-300">{user.country}</td>
-                  <td className="px-4 py-4 text-slate-400 text-sm">{new Date(user.createdAt).toLocaleDateString()}</td>
+                  <td className="px-4 py-4">
+                    <span className="text-blue-500 font-semibold">${user.profitBalance.toLocaleString()}</span>
+                  </td>
+                  <td className="px-4 py-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        user.kycStatus === "approved"
+                          ? "bg-emerald-500/20 text-emerald-400"
+                          : user.kycStatus === "rejected"
+                            ? "bg-red-500/20 text-red-400"
+                            : "bg-yellow-500/20 text-yellow-400"
+                      }`}
+                    >
+                      {user.kycStatus}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4">
+                    <button
+                      onClick={() => handleEditUser(user)}
+                      className="text-amber-500 hover:text-amber-400 font-medium text-sm"
+                    >
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div className="text-center text-slate-400 text-sm">
-        Showing {filteredUsers.length} of {users.length} users
       </div>
     </div>
   )

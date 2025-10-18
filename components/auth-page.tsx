@@ -206,7 +206,7 @@ export function AuthPage({ onLogin }: AuthPageProps) {
         <div className="w-full max-w-md">
           <div className="text-center mb-6">
             <img
-              src="https://i.ibb.co/pBSBnW9y/Whats-App-Image-2025-10-10-at-8-45-37-AM-1-removebg-preview-1.png"
+              src="/images/design-mode/Whats-App-Image-2025-10-10-at-8-45-37-AM-1-removebg-preview-1.png"
               alt="UltimateStckTrader Logo"
               className="w-24 h-24 mx-auto mb-4 object-contain"
             />

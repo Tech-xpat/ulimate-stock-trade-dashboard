@@ -70,7 +70,7 @@ export function SideMenu({ isOpen, onClose, activeView, onNavigate }: SideMenuPr
           <div className="flex items-center justify-between p-4 border-b border-slate-700">
             <div className="flex items-center gap-3">
               <img
-                src="https://i.ibb.co/pBSBnW9y/Whats-App-Image-2025-10-10-at-8-45-37-AM-1-removebg-preview-1.png"
+                src="/images/design-mode/Whats-App-Image-2025-10-10-at-8-45-37-AM-1-removebg-preview-1.png"
                 alt="UltimateStckTrader Logo"
                 className="w-10 h-10 object-contain"
               />
