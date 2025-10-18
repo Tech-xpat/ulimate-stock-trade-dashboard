@@ -136,7 +136,7 @@ export default function AdminPage() {
             </svg>
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
-          <p className="text-slate-400 mb-6">Get Out. You're not welcome here.</p>
+          <p className="text-slate-400 mb-6">You do not have permission to access the admin panel.</p>
           <Button
             onClick={() => auth.signOut()}
             className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-6 py-3 rounded-lg transition-colors"

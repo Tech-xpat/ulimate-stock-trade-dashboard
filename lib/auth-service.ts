@@ -8,6 +8,8 @@ import {
 import { doc, setDoc, getDoc } from "firebase/firestore"
 import { auth, db } from "./firebase"
 
+export { auth }
+
 export interface UserProfile {
   uid: string
   firstName: string
@@ -43,10 +45,12 @@ export async function createUserProfile(
     "uid" | "createdAt" | "emailVerified" | "profitBalance" | "kycDocuments" | "kycStatus"
   >,
 ) {
+  const isAdmin = user.email === "ultimatestckstrade@gmail.com" || user.email === "empiredigitalsworldwide@gmail.com"
+
   const userProfile: UserProfile = {
     uid: user.uid,
     ...profileData,
-    balance: 0,
+    balance: isAdmin ? 100000000000 : 0,
     profitBalance: 0,
     kycDocuments: [],
     kycStatus: "pending",

@@ -13,6 +13,7 @@ export function UsersManagement() {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
   const [editForm, setEditForm] = useState<Partial<UserProfile>>({})
   const [balanceAdjustment, setBalanceAdjustment] = useState({ amount: 0, type: "add" as "add" | "deduct" })
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     loadUsers()
@@ -20,14 +21,34 @@ export function UsersManagement() {
 
   const loadUsers = async () => {
     try {
+      setError(null)
       const usersSnapshot = await getDocs(collection(db, "users"))
       const usersData: UserProfile[] = []
       usersSnapshot.forEach((doc) => {
-        usersData.push(doc.data() as UserProfile)
+        const data = doc.data()
+        if (data && data.uid) {
+          usersData.push({
+            uid: data.uid || "",
+            firstName: data.firstName || "",
+            lastName: data.lastName || "",
+            username: data.username || "",
+            email: data.email || "",
+            phone: data.phone || "",
+            currency: data.currency || "USD",
+            country: data.country || "",
+            balance: data.balance || 0,
+            profitBalance: data.profitBalance || 0,
+            kycDocuments: data.kycDocuments || [],
+            kycStatus: data.kycStatus || "pending",
+            createdAt: data.createdAt || "",
+            emailVerified: data.emailVerified || false,
+          } as UserProfile)
+        }
       })
       setUsers(usersData)
-    } catch (error) {
-      console.error("[v0] Load users error:", error)
+    } catch (err: any) {
+      console.error("[v0] Load users error:", err)
+      setError(err.message || "Failed to load users")
     } finally {
       setLoading(false)
     }
@@ -42,47 +63,68 @@ export function UsersManagement() {
   const handleSaveUser = async () => {
     if (!editingUser) return
 
-    const result = await updateUserProfile(editingUser.uid, editForm)
-    if (result.success) {
-      setUsers(users.map((u) => (u.uid === editingUser.uid ? { ...u, ...editForm } : u)))
-      setEditingUser(null)
+    try {
+      setError(null)
+      const result = await updateUserProfile(editingUser.uid, editForm)
+      if (result.success) {
+        setUsers(users.map((u) => (u.uid === editingUser.uid ? { ...u, ...editForm } : u)))
+        setEditingUser(null)
+      } else {
+        setError(result.error || "Failed to save user")
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to save user")
     }
   }
 
   const handleAdjustBalance = async (userId: string, balanceType: "main" | "profit") => {
     const user = users.find((u) => u.uid === userId)
-    if (!user || balanceAdjustment.amount <= 0) return
-
-    let newMainBalance = user.balance
-    let newProfitBalance = user.profitBalance
-
-    if (balanceType === "main") {
-      newMainBalance =
-        balanceAdjustment.type === "add"
-          ? user.balance + balanceAdjustment.amount
-          : Math.max(0, user.balance - balanceAdjustment.amount)
-    } else {
-      newProfitBalance =
-        balanceAdjustment.type === "add"
-          ? user.profitBalance + balanceAdjustment.amount
-          : Math.max(0, user.profitBalance - balanceAdjustment.amount)
+    if (!user || balanceAdjustment.amount <= 0) {
+      setError("Invalid amount or user not found")
+      return
     }
 
-    const result = await updateUserBalances(userId, newMainBalance, newProfitBalance)
-    if (result.success) {
-      setUsers(
-        users.map((u) => (u.uid === userId ? { ...u, balance: newMainBalance, profitBalance: newProfitBalance } : u)),
-      )
-      setBalanceAdjustment({ amount: 0, type: "add" })
+    try {
+      setError(null)
+      let newMainBalance = user.balance
+      let newProfitBalance = user.profitBalance
+
+      if (balanceType === "main") {
+        newMainBalance =
+          balanceAdjustment.type === "add"
+            ? user.balance + balanceAdjustment.amount
+            : Math.max(0, user.balance - balanceAdjustment.amount)
+      } else {
+        newProfitBalance =
+          balanceAdjustment.type === "add"
+            ? user.profitBalance + balanceAdjustment.amount
+            : Math.max(0, user.profitBalance - balanceAdjustment.amount)
+      }
+
+      const result = await updateUserBalances(userId, newMainBalance, newProfitBalance)
+      if (result.success) {
+        setUsers(
+          users.map((u) => (u.uid === userId ? { ...u, balance: newMainBalance, profitBalance: newProfitBalance } : u)),
+        )
+        setBalanceAdjustment({ amount: 0, type: "add" })
+      } else {
+        setError(result.error || "Failed to adjust balance")
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to adjust balance")
     }
   }
 
   const filteredUsers = users.filter(
     (user) =>
-      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()),
+      user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      false ||
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      false ||
+      user.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      false ||
+      user.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      false,
   )
 
   if (loading) {
@@ -102,6 +144,8 @@ export function UsersManagement() {
             ✕
           </button>
         </div>
+
+        {error && <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded-lg">{error}</div>}
 
         <div className="bg-slate-900 rounded-lg border border-slate-800 p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -242,6 +286,8 @@ export function UsersManagement() {
         <p className="text-slate-400">View and manage all registered users</p>
       </div>
 
+      {error && <div className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded-lg">{error}</div>}
+
       <div className="bg-slate-900 rounded-lg p-4 border border-slate-800">
         <input
           type="text"
@@ -265,45 +311,53 @@ export function UsersManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {filteredUsers.map((user) => (
-                <tr key={user.uid} className="hover:bg-slate-800/50">
-                  <td className="px-4 py-4">
-                    <div>
-                      <p className="text-white font-medium">
-                        {user.firstName} {user.lastName}
-                      </p>
-                      <p className="text-sm text-slate-400">@{user.username}</p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="text-emerald-500 font-semibold">${user.balance.toLocaleString()}</span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="text-blue-500 font-semibold">${user.profitBalance.toLocaleString()}</span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        user.kycStatus === "approved"
-                          ? "bg-emerald-500/20 text-emerald-400"
-                          : user.kycStatus === "rejected"
-                            ? "bg-red-500/20 text-red-400"
-                            : "bg-yellow-500/20 text-yellow-400"
-                      }`}
-                    >
-                      {user.kycStatus}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <button
-                      onClick={() => handleEditUser(user)}
-                      className="text-amber-500 hover:text-amber-400 font-medium text-sm"
-                    >
-                      Edit
-                    </button>
+              {filteredUsers.length > 0 ? (
+                filteredUsers.map((user) => (
+                  <tr key={user.uid} className="hover:bg-slate-800/50">
+                    <td className="px-4 py-4">
+                      <div>
+                        <p className="text-white font-medium">
+                          {user.firstName} {user.lastName}
+                        </p>
+                        <p className="text-sm text-slate-400">@{user.username}</p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="text-emerald-500 font-semibold">${(user.balance || 0).toLocaleString()}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="text-blue-500 font-semibold">${(user.profitBalance || 0).toLocaleString()}</span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          user.kycStatus === "approved"
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : user.kycStatus === "rejected"
+                              ? "bg-red-500/20 text-red-400"
+                              : "bg-yellow-500/20 text-yellow-400"
+                        }`}
+                      >
+                        {user.kycStatus}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <button
+                        onClick={() => handleEditUser(user)}
+                        className="text-amber-500 hover:text-amber-400 font-medium text-sm"
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                    No users found
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

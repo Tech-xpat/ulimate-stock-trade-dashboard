@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Search, TrendingUp, Star } from "lucide-react"
+import { auth } from "@/lib/firebase"
+import { getUserProfile, getUserTransactions, updateUserBalance, addTransaction } from "@/lib/auth-service"
 
 export function BuyingView() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -9,6 +11,24 @@ export function BuyingView() {
   const [amount, setAmount] = useState("")
   const [orderType, setOrderType] = useState<"market" | "limit">("market")
   const [assetType, setAssetType] = useState<"crypto" | "forex">("crypto")
+  const [userBalance, setUserBalance] = useState(0)
+  const [transactions, setTransactions] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const user = auth.currentUser
+      if (user) {
+        const profile = await getUserProfile(user.uid)
+        if (profile) {
+          setUserBalance(profile.balance)
+        }
+        const userTransactions = await getUserTransactions(user.uid)
+        const buyTransactions = userTransactions.filter((t) => t.type === "buy")
+        setTransactions(buyTransactions)
+      }
+    }
+    fetchUserData()
+  }, [])
 
   useEffect(() => {
     if (selectedAsset) {
@@ -261,6 +281,37 @@ export function BuyingView() {
           <button
             disabled={!amount || Number.parseFloat(amount) <= 0}
             className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-4 rounded-xl transition-all duration-300 transform active:scale-95"
+            onClick={async () => {
+              if (!selectedAsset || !amount || Number.parseFloat(amount) <= 0) return
+
+              const user = auth.currentUser
+              if (!user) return
+
+              const buyAmount = Number.parseFloat(amount)
+              if (buyAmount > userBalance) {
+                alert("Insufficient balance")
+                return
+              }
+
+              const newBalance = userBalance - buyAmount
+              await updateUserBalance(user.uid, newBalance)
+
+              const assetPrice = assets.find((a) => a.symbol === selectedAsset)?.price || 0
+              const quantity = buyAmount / assetPrice
+
+              await addTransaction(user.uid, {
+                type: "buy",
+                amount: buyAmount,
+                currency: selectedAsset,
+                status: "completed",
+                timestamp: new Date().toISOString(),
+                description: `Bought ${quantity.toFixed(6)} ${selectedAsset} at $${assetPrice}`,
+              })
+
+              setUserBalance(newBalance)
+              setAmount("")
+              alert("Purchase successful!")
+            }}
           >
             Buy {selectedAsset}
           </button>

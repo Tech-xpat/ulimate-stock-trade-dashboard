@@ -2,12 +2,31 @@
 
 import { useState, useEffect } from "react"
 import { TrendingDown, Wallet } from "lucide-react"
+import { auth, getUserProfile, getUserTransactions, updateUserBalance, addTransaction } from "@/lib/auth-service"
 
 export function SellingView() {
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
   const [amount, setAmount] = useState("")
   const [orderType, setOrderType] = useState<"market" | "limit">("market")
   const [assetType, setAssetType] = useState<"crypto" | "forex">("crypto")
+  const [userBalance, setUserBalance] = useState(0)
+  const [transactions, setTransactions] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const user = auth.currentUser
+      if (user) {
+        const profile = await getUserProfile(user.uid)
+        if (profile) {
+          setUserBalance(profile.balance)
+        }
+        const userTransactions = await getUserTransactions(user.uid)
+        const sellTransactions = userTransactions.filter((t) => t.type === "sell")
+        setTransactions(sellTransactions)
+      }
+    }
+    fetchUserData()
+  }, [])
 
   useEffect(() => {
     if (selectedAsset) {
@@ -292,6 +311,37 @@ export function SellingView() {
           {/* Sell Button */}
           <button
             disabled={!amount || Number.parseFloat(amount) <= 0}
+            onClick={async () => {
+              if (!selectedAsset || !amount || Number.parseFloat(amount) <= 0) return
+
+              const user = auth.currentUser
+              if (!user) return
+
+              const holding = holdings.find((h) => h.symbol === selectedAsset)
+              if (!holding || Number.parseFloat(amount) > holding.quantity) {
+                alert("Insufficient holdings")
+                return
+              }
+
+              const sellQuantity = Number.parseFloat(amount)
+              const sellAmount = sellQuantity * (holding.currentPrice || 0)
+              const newBalance = userBalance + sellAmount
+
+              await updateUserBalance(user.uid, newBalance)
+
+              await addTransaction(user.uid, {
+                type: "sell",
+                amount: sellAmount,
+                currency: selectedAsset,
+                status: "completed",
+                timestamp: new Date().toISOString(),
+                description: `Sold ${sellQuantity} ${selectedAsset} at $${holding.currentPrice}`,
+              })
+
+              setUserBalance(newBalance)
+              setAmount("")
+              alert("Sale successful!")
+            }}
             className="w-full bg-red-500 hover:bg-red-600 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-4 rounded-xl transition-all duration-300 transform active:scale-95"
           >
             Sell {selectedAsset}

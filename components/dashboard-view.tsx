@@ -23,6 +23,8 @@ export function DashboardView({ userName, onNavigate }: DashboardViewProps) {
     polkadot: { price: 0, change: 0 },
   })
   const [balance, setBalance] = useState(0)
+  const [profitBalance, setProfitBalance] = useState(0)
+  const [selectedCurrency, setSelectedCurrency] = useState("USD")
 
   useEffect(() => {
     const script = document.createElement("script")
@@ -120,6 +122,8 @@ export function DashboardView({ userName, onNavigate }: DashboardViewProps) {
         const profile = await getUserProfile(user.uid)
         if (profile) {
           setBalance(profile.balance)
+          setProfitBalance(profile.profitBalance)
+          setSelectedCurrency(profile.currency || "USD")
         }
       }
     }
@@ -143,8 +147,18 @@ export function DashboardView({ userName, onNavigate }: DashboardViewProps) {
       <div className="space-y-2">
         <p className="text-slate-400 text-sm">Your total balance</p>
         <div className="flex items-end gap-2">
-          <h1 className="text-4xl md:text-5xl font-bold">${balance.toFixed(2)}</h1>
-          {balance > 0 && <span className="text-emerald-400 text-base md:text-lg font-semibold mb-1">+0.00%</span>}
+          <h1 className="text-4xl md:text-5xl font-bold">${(balance + profitBalance).toFixed(2)}</h1>
+          {balance + profitBalance > 0 && (
+            <span className="text-emerald-400 text-base md:text-lg font-semibold mb-1">+0.00%</span>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
+          <div className="text-slate-400">
+            Main Balance: <span className="text-emerald-400 font-semibold">${balance.toFixed(2)}</span>
+          </div>
+          <div className="text-slate-400">
+            Profit Balance: <span className="text-blue-400 font-semibold">${profitBalance.toFixed(2)}</span>
+          </div>
         </div>
       </div>
 
@@ -285,6 +299,26 @@ export function DashboardView({ userName, onNavigate }: DashboardViewProps) {
         >
           Withdraw
         </button>
+      </div>
+
+      <div className="bg-slate-900/50 rounded-2xl p-4 md:p-5 border border-slate-800">
+        <label className="text-xs md:text-sm text-slate-400 mb-2 block">Display Currency</label>
+        <select
+          value={selectedCurrency}
+          onChange={(e) => setSelectedCurrency(e.target.value)}
+          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+        >
+          <option value="USD">US Dollar (USD)</option>
+          <option value="EUR">Euro (EUR)</option>
+          <option value="GBP">British Pound (GBP)</option>
+          <option value="JPY">Japanese Yen (JPY)</option>
+          <option value="AUD">Australian Dollar (AUD)</option>
+          <option value="CAD">Canadian Dollar (CAD)</option>
+          <option value="CHF">Swiss Franc (CHF)</option>
+          <option value="CNY">Chinese Yuan (CNY)</option>
+          <option value="INR">Indian Rupee (INR)</option>
+          <option value="ZAR">South African Rand (ZAR)</option>
+        </select>
       </div>
     </div>
   )
