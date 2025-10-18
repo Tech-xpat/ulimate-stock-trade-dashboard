@@ -25,7 +25,13 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
   }
 
   const handleWithdraw = async () => {
-    if (!amount || !walletAddress || Number.parseFloat(amount) <= 0 || Number.parseFloat(amount) > availableBalance) {
+    if (
+      !amount ||
+      !walletAddress ||
+      Number.parseFloat(amount) <= 0 ||
+      Number.parseFloat(amount) > availableBalance ||
+      Number.parseFloat(amount) < 500
+    ) {
       return
     }
 
@@ -137,6 +143,7 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
       {/* Amount Input */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6">
         <label className="text-xs md:text-sm text-slate-400 mb-2 block">Withdrawal Amount (USD)</label>
+        <p className="text-xs text-amber-400 mb-3">Minimum withdrawal: $500</p>
         <div className="relative mb-3 md:mb-4">
           <span className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-xl md:text-2xl font-bold text-slate-400">
             $
@@ -146,6 +153,7 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
+            min="500"
             max={availableBalance}
             className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 md:pl-10 pr-4 py-3 md:py-4 text-2xl md:text-3xl font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
@@ -178,10 +186,14 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
       </div>
 
       {/* Warning */}
-      {Number.parseFloat(amount) > availableBalance && (
+      {(Number.parseFloat(amount) > availableBalance || Number.parseFloat(amount) < 500) && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 md:p-4 flex items-start gap-2 md:gap-3">
           <AlertCircle className="w-4 h-4 md:w-5 md:h-5 text-red-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs md:text-sm text-red-300">Withdrawal amount exceeds available balance</p>
+          <p className="text-xs md:text-sm text-red-300">
+            {Number.parseFloat(amount) > availableBalance
+              ? "Withdrawal amount exceeds available balance"
+              : "Minimum withdrawal amount is $500"}
+          </p>
         </div>
       )}
 
@@ -193,6 +205,7 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
           !walletAddress ||
           Number.parseFloat(amount) <= 0 ||
           Number.parseFloat(amount) > availableBalance ||
+          Number.parseFloat(amount) < 500 ||
           isLoading
         }
         className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3 md:py-4 rounded-xl transition-all duration-300 transform active:scale-95 text-sm md:text-base"

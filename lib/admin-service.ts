@@ -36,6 +36,14 @@ export interface DepositRequest {
   processedBy?: string
 }
 
+export interface KYCDocument {
+  userId: string
+  username: string
+  documentUrl: string
+  uploadedAt: string
+  status: "pending" | "approved" | "rejected"
+}
+
 // Check if user is admin by email
 const ADMIN_EMAILS = ["ultimatestckstrade@gmail.com", "empiredigitalsworldwide@gmail.com"]
 
@@ -282,6 +290,48 @@ export async function getAllDeposits(): Promise<DepositRequest[]> {
     return requests
   } catch (error) {
     console.error("[v0] Get all deposits error:", error)
+    return []
+  }
+}
+
+export async function addKYCDocument(
+  userId: string,
+  username: string,
+  documentUrl: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const docId = `KYC-${userId}-${Date.now()}`
+    const kycDoc: KYCDocument = {
+      userId,
+      username,
+      documentUrl,
+      uploadedAt: new Date().toISOString(),
+      status: "pending",
+    }
+    await setDoc(doc(db, "kycDocuments", docId), kycDoc)
+    return { success: true }
+  } catch (error: any) {
+    console.error("[v0] Add KYC document error:", error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function getKYCDocuments(userId?: string): Promise<KYCDocument[]> {
+  try {
+    let q
+    if (userId) {
+      q = query(collection(db, "kycDocuments"), where("userId", "==", userId))
+    } else {
+      q = query(collection(db, "kycDocuments"))
+    }
+    const querySnapshot = await getDocs(q)
+    const docs: KYCDocument[] = []
+    querySnapshot.forEach((doc) => {
+      docs.push(doc.data() as KYCDocument)
+    })
+    return docs
+  } catch (error) {
+    console.error("[v0] Get KYC documents error:", error)
     return []
   }
 }

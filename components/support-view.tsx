@@ -1,24 +1,45 @@
 "use client"
 
-import { Mail, Send, MessageSquare, Clock } from "lucide-react"
+import { Mail, Send, MessageSquare, Clock, MessageCircle } from "lucide-react"
 import { useState } from "react"
 
 export function SupportView() {
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
 
+  const whatsappNumber = "+27715403179"
+  const whatsappMessage = "Hello, USTrader, I need help"
+
+  const handleWhatsAppClick = () => {
+    const encodedMessage = encodeURIComponent(whatsappMessage)
+    window.open(`https://wa.me/${whatsappNumber.replace(/\D/g, "")}?text=${encodedMessage}`, "_blank")
+  }
+
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-6">
       <div className="flex items-center gap-3 mb-6">
         <Mail className="w-8 h-8 text-lime-400" />
         <div>
-          <h2 className="text-2xl font-bold">Email Support</h2>
+          <h2 className="text-2xl font-bold">Customer Support</h2>
           <p className="text-sm text-slate-400">We're here to help you</p>
         </div>
       </div>
 
       {/* Contact Info */}
       <div className="grid grid-cols-1 gap-3">
+        <button
+          onClick={handleWhatsAppClick}
+          className="bg-gradient-to-br from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 rounded-2xl p-5 flex items-center gap-4 transition-all active:scale-95"
+        >
+          <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+            <MessageCircle className="w-6 h-6 text-white" />
+          </div>
+          <div className="text-left">
+            <p className="text-xs text-green-100">WhatsApp Support</p>
+            <p className="font-semibold text-white">{whatsappNumber}</p>
+          </div>
+        </button>
+
         <div className="bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl p-5 flex items-center gap-4">
           <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
             <Mail className="w-6 h-6 text-white" />

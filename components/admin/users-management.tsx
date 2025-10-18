@@ -12,6 +12,7 @@ export function UsersManagement() {
   const [searchTerm, setSearchTerm] = useState("")
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
   const [editForm, setEditForm] = useState<Partial<UserProfile>>({})
+  const [balanceAdjustment, setBalanceAdjustment] = useState({ amount: 0, type: "add" as "add" | "deduct" })
 
   useEffect(() => {
     loadUsers()
@@ -35,6 +36,7 @@ export function UsersManagement() {
   const handleEditUser = (user: UserProfile) => {
     setEditingUser(user)
     setEditForm(user)
+    setBalanceAdjustment({ amount: 0, type: "add" })
   }
 
   const handleSaveUser = async () => {
@@ -47,18 +49,31 @@ export function UsersManagement() {
     }
   }
 
-  const handleAddBalance = async (userId: string, type: "main" | "profit", amount: number) => {
+  const handleAdjustBalance = async (userId: string, balanceType: "main" | "profit") => {
     const user = users.find((u) => u.uid === userId)
-    if (!user) return
+    if (!user || balanceAdjustment.amount <= 0) return
 
-    const newMainBalance = type === "main" ? user.balance + amount : user.balance
-    const newProfitBalance = type === "profit" ? user.profitBalance + amount : user.profitBalance
+    let newMainBalance = user.balance
+    let newProfitBalance = user.profitBalance
+
+    if (balanceType === "main") {
+      newMainBalance =
+        balanceAdjustment.type === "add"
+          ? user.balance + balanceAdjustment.amount
+          : Math.max(0, user.balance - balanceAdjustment.amount)
+    } else {
+      newProfitBalance =
+        balanceAdjustment.type === "add"
+          ? user.profitBalance + balanceAdjustment.amount
+          : Math.max(0, user.profitBalance - balanceAdjustment.amount)
+    }
 
     const result = await updateUserBalances(userId, newMainBalance, newProfitBalance)
     if (result.success) {
       setUsers(
         users.map((u) => (u.uid === userId ? { ...u, balance: newMainBalance, profitBalance: newProfitBalance } : u)),
       )
+      setBalanceAdjustment({ amount: 0, type: "add" })
     }
   }
 
@@ -112,37 +127,79 @@ export function UsersManagement() {
 
           <div>
             <label className="text-sm text-slate-400 mb-2 block">Main Balance</label>
-            <div className="flex gap-2">
+            <div className="space-y-2">
               <input
                 type="number"
                 value={editForm.balance || 0}
                 onChange={(e) => setEditForm({ ...editForm, balance: Number(e.target.value) })}
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
               />
-              <button
-                onClick={() => handleAddBalance(editingUser.uid, "main", 100)}
-                className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg"
-              >
-                +$100
-              </button>
+              <div className="flex gap-2">
+                <div className="flex-1 flex gap-2">
+                  <input
+                    type="number"
+                    value={balanceAdjustment.amount}
+                    onChange={(e) => setBalanceAdjustment({ ...balanceAdjustment, amount: Number(e.target.value) })}
+                    placeholder="Amount"
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                  />
+                  <select
+                    value={balanceAdjustment.type}
+                    onChange={(e) =>
+                      setBalanceAdjustment({ ...balanceAdjustment, type: e.target.value as "add" | "deduct" })
+                    }
+                    className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                  >
+                    <option value="add">Add</option>
+                    <option value="deduct">Deduct</option>
+                  </select>
+                </div>
+                <button
+                  onClick={() => handleAdjustBalance(editingUser.uid, "main")}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                >
+                  Apply
+                </button>
+              </div>
             </div>
           </div>
 
           <div>
             <label className="text-sm text-slate-400 mb-2 block">Profit Balance</label>
-            <div className="flex gap-2">
+            <div className="space-y-2">
               <input
                 type="number"
                 value={editForm.profitBalance || 0}
                 onChange={(e) => setEditForm({ ...editForm, profitBalance: Number(e.target.value) })}
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white"
               />
-              <button
-                onClick={() => handleAddBalance(editingUser.uid, "profit", 100)}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg"
-              >
-                +$100
-              </button>
+              <div className="flex gap-2">
+                <div className="flex-1 flex gap-2">
+                  <input
+                    type="number"
+                    value={balanceAdjustment.amount}
+                    onChange={(e) => setBalanceAdjustment({ ...balanceAdjustment, amount: Number(e.target.value) })}
+                    placeholder="Amount"
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                  />
+                  <select
+                    value={balanceAdjustment.type}
+                    onChange={(e) =>
+                      setBalanceAdjustment({ ...balanceAdjustment, type: e.target.value as "add" | "deduct" })
+                    }
+                    className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                  >
+                    <option value="add">Add</option>
+                    <option value="deduct">Deduct</option>
+                  </select>
+                </div>
+                <button
+                  onClick={() => handleAdjustBalance(editingUser.uid, "profit")}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                >
+                  Apply
+                </button>
+              </div>
             </div>
           </div>
 

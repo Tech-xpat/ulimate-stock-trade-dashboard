@@ -62,6 +62,7 @@ const countries = [
   "Italy",
   "Japan",
   "Kenya",
+  "Liberia",
   "Madagascar",
   "Malaysia",
   "Mexico",
