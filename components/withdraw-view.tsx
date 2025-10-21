@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from "react"
 import { Bitcoin, Wallet, AlertCircle, Check, X } from "lucide-react"
 import { createWithdrawalRequest } from "@/lib/admin-service"
+import { getClientAuth } from "@/lib/firebase-client"
 
 interface WithdrawViewProps {
   userId: string
@@ -33,15 +34,14 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
   const [errorMessage, setErrorMessage] = useState("")
 
   // local balance state so UI updates immediately after approval
-  const [localBalance, setLocalBalance] = useState<number>(availableBalance)
+  const [localBalance, setLocalBalance] = useState<number>(Number(availableBalance || 0))
 
   // success popup
   const [showSuccessPopup, setShowSuccessPopup] = useState(false)
   const [approvedAmount, setApprovedAmount] = useState<number | null>(null)
 
   useEffect(() => {
-    // keep localBalance in sync if parent prop changes
-    setLocalBalance(availableBalance)
+    setLocalBalance(Number(availableBalance || 0))
   }, [availableBalance])
 
   const MIN_WITHDRAWAL = 100
@@ -64,7 +64,6 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
     setErrorMessage("")
     const parsedAmount = Number.parseFloat(amount || "0")
 
-    // client-side checks
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       setErrorMessage("Please enter a valid amount.")
       return
@@ -93,6 +92,27 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
 
     setIsLoading(true)
 
+    // attempt to get idToken from firebase client
+    let idToken: string | null = null
+    try {
+      const auth = getClientAuth()
+      const user = auth.currentUser
+      if (!user) {
+        setErrorMessage("Authentication required. Please sign in.")
+        setIsLoading(false)
+        return
+      }
+      if (user.uid !== userId) {
+        setErrorMessage("Authenticated user mismatch.")
+        setIsLoading(false)
+        return
+      }
+      idToken = await user.getIdToken()
+    } catch (err) {
+      console.warn("Could not obtain idToken:", err)
+      // continue — server should validate, but we proceed to send request without token as fallback
+    }
+
     const bankDetails =
       method === "BANK"
         ? {
@@ -107,7 +127,6 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         : undefined
 
     try {
-      // call backend to create + approve withdrawal. backend MUST verify identity and balance.
       const result = await createWithdrawalRequest(
         userId,
         username,
@@ -115,17 +134,14 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         method === "CRYPTO" ? selectedCrypto : "BANK",
         method === "CRYPTO" ? walletAddress : "",
         bankDetails,
+        { idToken },
       )
 
-      // treat result.success as backend approval granted
       if (result && result.success) {
-        // deduct from local balance and show success popup
         setLocalBalance((prev) => Math.max(0, +(prev - parsedAmount).toFixed(2)))
         setApprovedAmount(parsedAmount)
         setShowSuccessPopup(true)
         setIsSubmitted(true)
-
-        // auto-close popup after 3s
         setTimeout(() => setShowSuccessPopup(false), 3000)
       } else {
         setErrorMessage(result?.message || "Failed to submit withdrawal request. Please try again.")
@@ -138,45 +154,10 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
     }
   }
 
-  if (isSubmitted && !showSuccessPopup) {
-    // keep the submitted confirmation screen as before
-    return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-8 text-center space-y-4">
-          <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto">
-            <Check className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-emerald-400 mb-2">Withdrawal Approved</h3>
-            <p className="text-slate-300 text-sm">
-              Your withdrawal request has been approved. ${approvedAmount?.toFixed(2)} will be processed and has been deducted from your balance.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setIsSubmitted(false)
-              setAmount("")
-              setWalletAddress("")
-              setBankName("")
-              setAccountNumber("")
-              setRoutingNumber("")
-              setSortCode("")
-              setIban("")
-              setSwiftBic("")
-              setErrorMessage("")
-            }}
-            className="text-emerald-400 hover:text-emerald-300 text-sm font-medium"
-          >
-            Make Another Withdrawal
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   const parsedAmountForWarning = Number.parseFloat(amount || "0")
   const formDisabled = isLoading || localBalance < MIN_WITHDRAWAL
 
+  // Render
   return (
     <div className="max-w-2xl mx-auto space-y-4 md:space-y-6 pb-6">
       <div>
@@ -184,7 +165,6 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         <p className="text-slate-400 text-xs md:text-sm">Transfer money from your account</p>
       </div>
 
-      {/* Available Balance (uses localBalance) */}
       <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-4 md:p-5 border border-slate-700">
         <div className="flex items-center justify-between">
           <div>
@@ -204,7 +184,6 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         </div>
       )}
 
-      {/* Method Selection */}
       <div className="space-y-2">
         <label className="text-xs md:text-sm font-medium">Payout Method</label>
         <div className="flex gap-2">
@@ -225,7 +204,6 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         </div>
       </div>
 
-      {/* Crypto Selection */}
       {method === "CRYPTO" && (
         <div className="space-y-2">
           <label className="text-xs md:text-sm font-medium">Select Cryptocurrency</label>
@@ -268,7 +246,6 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         </div>
       )}
 
-      {/* Amount Input */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6">
         <label className="text-xs md:text-sm text-slate-400 mb-2 block">Withdrawal Amount (USD)</label>
         <p className="text-xs text-amber-400 mb-3">Minimum withdrawal: ${MIN_WITHDRAWAL}</p>
@@ -289,7 +266,6 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
           />
         </div>
 
-        {/* Quick Percentage Buttons */}
         <div className="grid grid-cols-4 gap-2">
           {quickPercentages.map((percentage) => (
             <button
@@ -304,7 +280,6 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         </div>
       </div>
 
-      {/* Crypto Wallet Input */}
       {method === "CRYPTO" && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6">
           <label className="text-xs md:text-sm text-slate-400 mb-2 block">{selectedCrypto} Wallet Address</label>
@@ -319,7 +294,6 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         </div>
       )}
 
-      {/* Bank Transfer Form */}
       {method === "BANK" && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6 space-y-3">
           <label className="text-xs md:text-sm text-slate-400 mb-1 block">Bank Transfer Details</label>
@@ -456,14 +430,12 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         </div>
       )}
 
-      {/* Info */}
       <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 md:p-4 flex gap-3">
         <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
         <div className="text-sm text-blue-300">
           <p className="font-semibold mb-1">Important:</p>
           <ul className="space-y-1 text-xs">
-            <li>• Withdrawal requests require admin approval</li>
-            <li>• Processing typically takes 24-48 hours</li>
+            <li>• Processing typically takes 15 to 30 minutes</li>
             <li>• Ensure your wallet or bank details are correct</li>
             <li>• Server must validate your identity and balance before processing</li>
           </ul>
