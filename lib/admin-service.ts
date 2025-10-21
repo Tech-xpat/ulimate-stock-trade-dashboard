@@ -70,7 +70,7 @@ export async function createWithdrawalRequest(
   currencyOrMethod,
   walletAddress,
   bankDetails,
-  options,
+  options
 ) {
   try {
     const payload = {
