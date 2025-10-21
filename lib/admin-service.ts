@@ -335,3 +335,32 @@ export async function getKYCDocuments(userId?: string): Promise<KYCDocument[]> {
     return []
   }
 }
+// ...existing code...
+export async function createWithdrawalRequest(
+  userId: string,
+  username: string,
+  amount: number,
+  currencyOrMethod: string,
+  walletAddress?: string,
+  bankDetails?: Record<string, any> | undefined,
+  options?: { idToken?: string | null; autoApprove?: boolean },
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    const payload = {
+      userId,
+      username,
+      amount,
+      payoutMethod: currencyOrMethod,
+      walletAddress: walletAddress || undefined,
+      bankDetails: bankDetails || undefined,
+      autoApprove: options?.autoApprove === true,
+    }
+    const res = await authFetch("/api/withdrawals", "POST", payload, options?.idToken ?? null)
+    const data = await res.json()
+    return data as { success: boolean; message?: string }
+  } catch (err) {
+    console.error("createWithdrawalRequest error:", err)
+    return { success: false, message: "Network error" }
+  }
+}
+// ...existing code...
