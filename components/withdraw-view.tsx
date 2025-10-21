@@ -1,10 +1,8 @@
-// ...existing code...
 "use client"
 
 import React, { useEffect, useState } from "react"
 import { Bitcoin, Wallet, AlertCircle, Check, X } from "lucide-react"
 import { createWithdrawalRequest } from "@/lib/admin-service"
-import { getClientAuth } from "@/lib/firebase-client"
 
 interface WithdrawViewProps {
   userId: string
@@ -92,25 +90,29 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
 
     setIsLoading(true)
 
-    // attempt to get idToken from firebase client
+    // dynamic import of firebase client to avoid SSR/module-load errors
     let idToken: string | null = null
     try {
-      const auth = getClientAuth()
-      const user = auth.currentUser
-      if (!user) {
-        setErrorMessage("Authentication required. Please sign in.")
-        setIsLoading(false)
-        return
+      const mod = await import("@/lib/firebase-client")
+      if (mod && typeof mod.getClientAuth === "function") {
+        const auth = mod.getClientAuth()
+        const user = auth?.currentUser
+        if (!user) {
+          setErrorMessage("Authentication required. Please sign in.")
+          setIsLoading(false)
+          return
+        }
+        if (user.uid !== userId) {
+          setErrorMessage("Authenticated user mismatch.")
+          setIsLoading(false)
+          return
+        }
+        // get fresh token
+        idToken = await user.getIdToken()
       }
-      if (user.uid !== userId) {
-        setErrorMessage("Authenticated user mismatch.")
-        setIsLoading(false)
-        return
-      }
-      idToken = await user.getIdToken()
     } catch (err) {
-      console.warn("Could not obtain idToken:", err)
-      // continue — server should validate, but we proceed to send request without token as fallback
+      // don't crash — proceed without token (server should reject if required)
+      console.warn("Could not load firebase client or obtain token:", err)
     }
 
     const bankDetails =
@@ -157,7 +159,6 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
   const parsedAmountForWarning = Number.parseFloat(amount || "0")
   const formDisabled = isLoading || localBalance < MIN_WITHDRAWAL
 
-  // Render
   return (
     <div className="max-w-2xl mx-auto space-y-4 md:space-y-6 pb-6">
       <div>
@@ -435,7 +436,7 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
         <div className="text-sm text-blue-300">
           <p className="font-semibold mb-1">Important:</p>
           <ul className="space-y-1 text-xs">
-            <li>• Processing typically takes 15 to 30 minutes</li>
+            <li>• Processing typically takes 5 to 30 minutes</li>
             <li>• Ensure your wallet or bank details are correct</li>
             <li>• Server must validate your identity and balance before processing</li>
           </ul>
@@ -444,4 +445,3 @@ export function WithdrawView({ userId, username, availableBalance }: WithdrawVie
     </div>
   )
 }
-// ...existing code...
