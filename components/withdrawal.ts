@@ -1,15 +1,42 @@
 import type { NextApiRequest, NextApiResponse } from "next"
 import admin from "firebase-admin"
+import fs from "fs"
+import path from "path"
 
-if (!admin.apps.length) {
+const tryInitAdmin = () => {
+  if (admin.apps.length) return
+
+  // Prefer explicit JSON file in project root if present
+  const candidate = path.join(process.cwd(), "ultimatestcktrader-firebase-adminsdk-fbsvc-4ffb9b0ffb.json")
+  let serviceAccount: any = undefined
+
+  if (fs.existsSync(candidate)) {
+    serviceAccount = JSON.parse(fs.readFileSync(candidate, "utf8"))
+  } else if (process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON) {
+    try {
+      serviceAccount = JSON.parse(process.env.FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON)
+    } catch (err) {
+      console.error("Invalid FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON")
+    }
+  } else if (process.env.FIREBASE_ADMIN_PROJECT_ID && process.env.FIREBASE_ADMIN_CLIENT_EMAIL && process.env.FIREBASE_ADMIN_PRIVATE_KEY) {
+    serviceAccount = {
+      project_id: process.env.FIREBASE_ADMIN_PROJECT_ID,
+      client_email: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
+      private_key: (process.env.FIREBASE_ADMIN_PRIVATE_KEY || "").replace(/\\n/g, "\n"),
+    }
+  }
+
+  if (!serviceAccount) {
+    console.error("No Firebase admin service account configured. Set file in project root or FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON env.")
+    return
+  }
+
   admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_ADMIN_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    } as any),
+    credential: admin.credential.cert(serviceAccount),
   })
 }
+
+tryInitAdmin()
 const db = admin.firestore()
 const auth = admin.auth()
 
@@ -17,22 +44,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "POST") return res.status(405).json({ success: false, message: "Method not allowed" })
 
   const { userId, username, amount, payoutMethod, walletAddress, bankDetails, autoApprove } = req.body
-  // verify Authorization bearer token
+
+  // Verify bearer token
   const authHeader = (req.headers.authorization || "") as string
-  let uidFromToken: string | null = null
-  try {
-    if (authHeader.startsWith("Bearer ")) {
-      const token = authHeader.split(" ")[1]
-      const decoded = await auth.verifyIdToken(token)
-      uidFromToken = decoded.uid
-    }
-  } catch (err) {
-    // invalid token -> reject
+  if (!authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ success: false, message: "Unauthorized" })
   }
 
-  if (!uidFromToken || uidFromToken !== userId) {
-    return res.status(403).json({ success: false, message: "User mismatch or unauthorized" })
+  const token = authHeader.split(" ")[1]
+  let decoded: admin.auth.DecodedIdToken
+  try {
+    decoded = await auth.verifyIdToken(token)
+  } catch (err) {
+    console.error("verifyIdToken failed:", err)
+    return res.status(401).json({ success: false, message: "Invalid token" })
+  }
+
+  if (decoded.uid !== userId) {
+    return res.status(403).json({ success: false, message: "User mismatch" })
   }
 
   if (!amount || typeof amount !== "number" || amount <= 0) {
@@ -44,7 +73,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     let approved = false
-    let withdrawalDoc: admin.firestore.DocumentReference
 
     await db.runTransaction(async (tx) => {
       const userSnap = await tx.get(userRef)
@@ -53,7 +81,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const balance = Number(userData.balance || 0)
 
       if (autoApprove && balance >= amount) {
-        // deduct balance and create approved withdrawal
         const newBalance = +(balance - amount)
         tx.update(userRef, { balance: newBalance })
         const docRef = withdrawalsRef.doc()
@@ -69,9 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           approvedAt: admin.firestore.FieldValue.serverTimestamp(),
         })
         approved = true
-        withdrawalDoc = docRef
       } else {
-        // create pending withdrawal (admin will approve later)
         const docRef = withdrawalsRef.doc()
         tx.set(docRef, {
           userId,
@@ -84,7 +109,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         })
         approved = false
-        withdrawalDoc = docRef
       }
     })
 
