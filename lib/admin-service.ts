@@ -1,5 +1,17 @@
 // lightweight client API helpers (avoid client-only imports at module scope)
 
+export interface AdminWalletSettings {
+  btcAddress: string
+  btcTag: string
+  usdtAddress: string
+  usdtTag: string
+  bankAccountNumber: string
+  bankName: string
+  bankAccountName: string
+  lastUpdated: string
+  updatedBy: string
+}
+
 async function getIdTokenFromClient() {
   try {
     // dynamic import only when needed (avoids SSR/runtime import problems)
@@ -41,14 +53,13 @@ async function authFetch(input, method = "GET", body, idToken) {
   return res
 }
 
-export async function getAdminWalletSettings(options) {
+export async function updateAdminWalletSettings(settings: Partial<AdminWalletSettings>, options) {
   try {
-    const res = await authFetch("/api/admin/wallet-settings", "GET", undefined, options && options.idToken)
-    if (!res.ok) return null
+    const res = await authFetch("/api/admin/wallet-settings", "PUT", settings, options && options.idToken)
     return await res.json()
   } catch (err) {
-    console.error("getAdminWalletSettings error:", err)
-    return null
+    console.error("updateAdminWalletSettings error:", err)
+    return { success: false, error: "Network error" }
   }
 }
 

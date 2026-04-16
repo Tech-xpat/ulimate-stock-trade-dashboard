@@ -14,6 +14,9 @@ export function WalletSettings({ adminId }: WalletSettingsProps) {
     btcTag: "",
     usdtAddress: "",
     usdtTag: "",
+    bankAccountNumber: "",
+    bankName: "",
+    bankAccountName: "",
     lastUpdated: "",
     updatedBy: "",
   })
@@ -40,7 +43,7 @@ export function WalletSettings({ adminId }: WalletSettingsProps) {
     const result = await updateAdminWalletSettings({
       ...settings,
       updatedBy: adminId,
-    })
+    }, {})
 
     if (result.success) {
       setMessage("Wallet settings updated successfully!")
@@ -64,7 +67,7 @@ export function WalletSettings({ adminId }: WalletSettingsProps) {
     <div className="max-w-2xl space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-white mb-2">Wallet Settings</h2>
-        <p className="text-slate-400">Configure deposit wallet addresses for BTC and USDT</p>
+        <p className="text-slate-400">Configure deposit wallet addresses for BTC, USDT, and bank transfer details</p>
       </div>
 
       {message && (
@@ -106,29 +109,39 @@ export function WalletSettings({ adminId }: WalletSettingsProps) {
 
         <div className="border-t border-slate-800"></div>
 
-        {/* USDT Settings */}
+        {/* Bank Transfer Settings */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <span className="text-2xl">₮</span>
-            Tether (USDT)
+            <span className="text-2xl">🏦</span>
+            Bank Transfer
           </h3>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">USDT Wallet Address</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Bank Name</label>
             <input
               type="text"
-              value={settings.usdtAddress}
-              onChange={(e) => setSettings({ ...settings, usdtAddress: e.target.value })}
-              placeholder="Enter USDT wallet address"
+              value={settings.bankName}
+              onChange={(e) => setSettings({ ...settings, bankName: e.target.value })}
+              placeholder="Enter bank name"
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">USDT Memo/Tag (Optional)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Account Name</label>
             <input
               type="text"
-              value={settings.usdtTag}
-              onChange={(e) => setSettings({ ...settings, usdtTag: e.target.value })}
-              placeholder="Enter USDT memo/tag if required"
+              value={settings.bankAccountName}
+              onChange={(e) => setSettings({ ...settings, bankAccountName: e.target.value })}
+              placeholder="Enter account holder name"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Account Number</label>
+            <input
+              type="text"
+              value={settings.bankAccountNumber}
+              onChange={(e) => setSettings({ ...settings, bankAccountNumber: e.target.value })}
+              placeholder="Enter account number"
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>

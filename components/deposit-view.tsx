@@ -63,7 +63,7 @@ function TypingText({ text, duration = 3000, className = "" }: { text: string; d
 export function DepositView({ userId, username }: DepositViewProps) {
   const [step, setStep] = useState<"amount" | "payment">("amount")
   const [amount, setAmount] = useState("")
-  const [selectedCrypto, setSelectedCrypto] = useState<"BTC" | "USDT">("BTC")
+  const [selectedCrypto, setSelectedCrypto] = useState<"BTC" | "USDT" | "BANK">("BTC")
   const [walletSettings, setWalletSettings] = useState<AdminWalletSettings | null>(null)
   const [copiedAddress, setCopiedAddress] = useState(false)
   const [copiedTag, setCopiedTag] = useState(false)
@@ -111,6 +111,21 @@ export function DepositView({ userId, username }: DepositViewProps) {
               (settings as any).usdtMemo ||
               (settings as any).usdt_memo ||
               null,
+            bankAccountNumber:
+              (settings as any).bankAccountNumber ||
+              (settings as any).bank_account_number ||
+              (settings as any).bank?.accountNumber ||
+              null,
+            bankName:
+              (settings as any).bankName ||
+              (settings as any).bank_name ||
+              (settings as any).bank?.name ||
+              null,
+            bankAccountName:
+              (settings as any).bankAccountName ||
+              (settings as any).bank_account_name ||
+              (settings as any).bank?.accountName ||
+              null,
           }
           setWalletSettings(normalized as AdminWalletSettings)
         } else {
@@ -130,7 +145,7 @@ export function DepositView({ userId, username }: DepositViewProps) {
     fetchWalletSettings()
   }, [])
 
-  const handleCryptoChange = (crypto: "BTC" | "USDT") => {
+  const handleCryptoChange = (crypto: "BTC" | "USDT" | "BANK") => {
     setSelectedCrypto(crypto)
     setCopiedAddress(false)
     setCopiedTag(false)
@@ -138,8 +153,8 @@ export function DepositView({ userId, username }: DepositViewProps) {
 
   const handleProceedToPayment = () => {
     const parsed = Number.parseFloat(amount || "0")
-    const walletAddress = selectedCrypto === "BTC" ? walletSettings?.btcAddress : walletSettings?.usdtAddress
-    const tag = selectedCrypto === "BTC" ? walletSettings?.btcTag : walletSettings?.usdtTag
+    const walletAddress = selectedCrypto === "BTC" ? walletSettings?.btcAddress : selectedCrypto === "USDT" ? walletSettings?.usdtAddress : walletSettings?.bankAccountNumber
+    const tag = selectedCrypto === "BTC" ? walletSettings?.btcTag : selectedCrypto === "USDT" ? walletSettings?.usdtTag : null
 
     if (parsed >= 50 && walletAddress) {
       // if tag is required for this currency ensure it's present
@@ -208,8 +223,8 @@ export function DepositView({ userId, username }: DepositViewProps) {
   }
 
   // use normalized accessors
-  const walletAddress = selectedCrypto === "BTC" ? walletSettings?.btcAddress : walletSettings?.usdtAddress
-  const tag = selectedCrypto === "BTC" ? walletSettings?.btcTag : walletSettings?.usdtTag
+  const walletAddress = selectedCrypto === "BTC" ? walletSettings?.btcAddress : selectedCrypto === "USDT" ? walletSettings?.usdtAddress : walletSettings?.bankAccountNumber
+  const tag = selectedCrypto === "BTC" ? walletSettings?.btcTag : selectedCrypto === "USDT" ? walletSettings?.usdtTag : null
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -241,8 +256,8 @@ export function DepositView({ userId, username }: DepositViewProps) {
 
               {/* Crypto Selection */}
               <div className="space-y-3">
-                <label className="text-sm font-medium">Select Cryptocurrency</label>
-                <div className="grid grid-cols-2 gap-3">
+                <label className="text-sm font-medium">Select Payment Method</label>
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={() => handleCryptoChange("BTC")}
                     className={`flex items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all ${
@@ -275,6 +290,24 @@ export function DepositView({ userId, username }: DepositViewProps) {
                       <p className="text-xs text-slate-400">USDT</p>
                     </div>
                     {selectedCrypto === "USDT" && <Check className="w-5 h-5 text-emerald-400 ml-auto" />}
+                  </button>
+
+                  <button
+                    onClick={() => handleCryptoChange("BANK")}
+                    className={`flex items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                      selectedCrypto === "BANK"
+                        ? "border-emerald-500 bg-emerald-500/10"
+                        : "border-slate-800 bg-slate-900 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                      🏦
+                    </div>
+                    <div className="text-left">
+                      <p className="font-bold">Bank Transfer</p>
+                      <p className="text-xs text-slate-400">Wire</p>
+                    </div>
+                    {selectedCrypto === "BANK" && <Check className="w-5 h-5 text-emerald-400 ml-auto" />}
                   </button>
                 </div>
               </div>
@@ -323,6 +356,21 @@ export function DepositView({ userId, username }: DepositViewProps) {
                                 (s as any).usdtMemo ||
                                 (s as any).usdt_memo ||
                                 null,
+                              bankAccountNumber:
+                                (s as any).bankAccountNumber ||
+                                (s as any).bank_account_number ||
+                                (s as any).bank?.accountNumber ||
+                                null,
+                              bankName:
+                                (s as any).bankName ||
+                                (s as any).bank_name ||
+                                (s as any).bank?.name ||
+                                null,
+                              bankAccountName:
+                                (s as any).bankAccountName ||
+                                (s as any).bank_account_name ||
+                                (s as any).bank?.accountName ||
+                                null,
                             }
                             setWalletSettings(normalized as AdminWalletSettings)
                             setWalletError(null)
@@ -354,7 +402,7 @@ export function DepositView({ userId, username }: DepositViewProps) {
                   isLoadingWallet ||
                   !walletSettings ||
                   // also disable if selected currency has no address
-                  !(selectedCrypto === "BTC" ? walletSettings?.btcAddress : walletSettings?.usdtAddress)
+                  !(selectedCrypto === "BTC" ? walletSettings?.btcAddress : selectedCrypto === "USDT" ? walletSettings?.usdtAddress : walletSettings?.bankAccountNumber)
                 }
                 className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-4 rounded-xl transition-all duration-300 transform active:scale-95"
               >
@@ -371,38 +419,69 @@ export function DepositView({ userId, username }: DepositViewProps) {
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
                 <p className="text-sm text-slate-400 mb-1">Deposit Amount</p>
                 <p className="text-3xl font-bold text-emerald-400">${amount}</p>
-                <p className="text-xs text-slate-400 mt-1">via {selectedCrypto}</p>
+                <p className="text-xs text-slate-400 mt-1">via {selectedCrypto === "BANK" ? "Bank Transfer" : selectedCrypto}</p>
               </div>
 
               {/* Wallet Address */}
               {walletAddress ? (
                 <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                  <div>
-                    <label className="text-sm text-slate-400 mb-2 block">Wallet Address</label>
-                    <div className="bg-slate-950 border border-slate-700 rounded-xl p-4 flex items-center justify-between gap-3">
-                      <p className="text-sm font-mono break-all">{walletAddress}</p>
-                      <button
-                        onClick={() => copyToClipboard(walletAddress, "address")}
-                        className="flex-shrink-0 p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors"
-                      >
-                        {copiedAddress ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
+                  {selectedCrypto === "BANK" ? (
+                    <>
+                      <div>
+                        <label className="text-sm text-slate-400 mb-2 block">Bank Name</label>
+                        <div className="bg-slate-950 border border-slate-700 rounded-xl p-4">
+                          <p className="text-sm font-mono">{walletSettings?.bankName || "-"}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm text-slate-400 mb-2 block">Account Name</label>
+                        <div className="bg-slate-950 border border-slate-700 rounded-xl p-4">
+                          <p className="text-sm font-mono">{walletSettings?.bankAccountName || "-"}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm text-slate-400 mb-2 block">Account Number</label>
+                        <div className="bg-slate-950 border border-slate-700 rounded-xl p-4 flex items-center justify-between gap-3">
+                          <p className="text-sm font-mono break-all">{walletAddress}</p>
+                          <button
+                            onClick={() => copyToClipboard(walletAddress, "address")}
+                            className="flex-shrink-0 p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors"
+                          >
+                            {copiedAddress ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="text-sm text-slate-400 mb-2 block">Wallet Address</label>
+                        <div className="bg-slate-950 border border-slate-700 rounded-xl p-4 flex items-center justify-between gap-3">
+                          <p className="text-sm font-mono break-all">{walletAddress}</p>
+                          <button
+                            onClick={() => copyToClipboard(walletAddress, "address")}
+                            className="flex-shrink-0 p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors"
+                          >
+                            {copiedAddress ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
 
-                  <div>
-                    <label className="text-sm text-slate-400 mb-2 block">Tag/Memo</label>
-                    <div className="bg-slate-950 border border-slate-700 rounded-xl p-4 flex items-center justify-between gap-3">
-                      <p className="text-sm font-mono">{tag ?? "-"}</p>
-                      <button
-                        onClick={() => tag && copyToClipboard(tag, "tag")}
-                        disabled={!tag}
-                        className="flex-shrink-0 p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors disabled:opacity-60"
-                      >
-                        {copiedTag ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
+                      <div>
+                        <label className="text-sm text-slate-400 mb-2 block">Tag/Memo</label>
+                        <div className="bg-slate-950 border border-slate-700 rounded-xl p-4 flex items-center justify-between gap-3">
+                          <p className="text-sm font-mono">{tag ?? "-"}</p>
+                          <button
+                            onClick={() => tag && copyToClipboard(tag, "tag")}
+                            disabled={!tag}
+                            className="flex-shrink-0 p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors disabled:opacity-60"
+                          >
+                            {copiedTag ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex gap-3">
