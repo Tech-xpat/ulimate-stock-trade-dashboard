@@ -35,25 +35,45 @@ export function KYCUpload({ userId, onUploadSuccess }: KYCUploadProps) {
     setMessage("")
 
     try {
+      const newUploadedDocs: string[] = []
+      let successCount = 0
+      let failureCount = 0
+
       for (const file of files) {
         // Create a data URL for the file (in production, you'd upload to cloud storage)
-        const reader = new FileReader()
-        reader.onload = async (e) => {
-          const dataUrl = e.target?.result as string
-          const result = await addKYCDocument(userId, dataUrl)
-
-          if (result.success) {
-            setUploadedDocs([...uploadedDocs, dataUrl])
-            setMessage("Document uploaded successfully!")
-            onUploadSuccess?.()
-          } else {
-            setMessage("Failed to upload document")
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            resolve(e.target?.result as string)
           }
+          reader.onerror = () => {
+            reject(new Error("Failed to read file"))
+          }
+          reader.readAsDataURL(file)
+        })
+
+        const result = await addKYCDocument(userId, dataUrl)
+
+        if (result.success) {
+          newUploadedDocs.push(dataUrl)
+          successCount++
+        } else {
+          failureCount++
+          console.error("[v0] Failed to upload document:", result.error)
         }
-        reader.readAsDataURL(file)
       }
 
+      setUploadedDocs((prev) => [...prev, ...newUploadedDocs])
       setFiles([])
+
+      if (successCount > 0) {
+        setMessage(
+          `${successCount} document${successCount > 1 ? "s" : ""} uploaded successfully!${failureCount > 0 ? ` (${failureCount} failed)` : ""}`
+        )
+        onUploadSuccess?.()
+      } else {
+        setMessage("Failed to upload all documents")
+      }
     } catch (error) {
       setMessage("Error uploading documents")
       console.error("[v0] Upload error:", error)

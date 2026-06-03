@@ -100,4 +100,43 @@ export async function createWithdrawalRequest(
     return { success: false, message: "Network error" }
   }
 }
-// im done with this 
+
+export interface WithdrawalRequest {
+  id: string
+  userId: string
+  username: string
+  amount: number
+  payoutMethod: string
+  walletAddress?: string
+  bankDetails?: any
+  status: "pending" | "approved" | "rejected"
+  requestedAt: string
+  approvedAt?: string
+  crypto?: string
+}
+
+export async function getPendingWithdrawals(options?: { idToken?: string }): Promise<WithdrawalRequest[]> {
+  try {
+    const res = await authFetch("/api/admin/withdrawals", "GET", null, options?.idToken)
+    if (!res.ok) {
+      console.error("getPendingWithdrawals error:", res.status)
+      return []
+    }
+    const data = await res.json()
+    return data.withdrawals || []
+  } catch (err) {
+    console.error("getPendingWithdrawals error:", err)
+    return []
+  }
+}
+
+export async function approveWithdrawal(withdrawalId: string, adminId: string, options?: { idToken?: string }) {
+  try {
+    const payload = { withdrawalId, adminId }
+    const res = await authFetch("/api/admin/withdrawals/approve", "POST", payload, options?.idToken)
+    return await res.json()
+  } catch (err) {
+    console.error("approveWithdrawal error:", err)
+    return { success: false, error: "Network error" }
+  }
+} 
