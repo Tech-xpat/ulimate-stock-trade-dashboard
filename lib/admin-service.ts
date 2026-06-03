@@ -139,4 +139,44 @@ export async function approveWithdrawal(withdrawalId: string, adminId: string, o
     console.error("approveWithdrawal error:", err)
     return { success: false, error: "Network error" }
   }
+}
+
+export async function getAdminWalletSettings(options?: { idToken?: string }): Promise<AdminWalletSettings | null> {
+  try {
+    const res = await authFetch("/api/admin/wallet-settings", "GET", null, options?.idToken)
+    if (!res.ok) {
+      console.error("getAdminWalletSettings error:", res.status)
+      return null
+    }
+    return await res.json()
+  } catch (err) {
+    console.error("getAdminWalletSettings error:", err)
+    return null
+  }
+}
+
+export async function isAdminByEmail(email: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/admin/check-admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    })
+    const data = await res.json()
+    return data.isAdmin || false
+  } catch (err) {
+    console.error("isAdminByEmail error:", err)
+    return false
+  }
+}
+
+export async function createAdminRecord(userId: string, email: string, options?: { idToken?: string }) {
+  try {
+    const payload = { userId, email }
+    const res = await authFetch("/api/admin/create-record", "POST", payload, options?.idToken)
+    return await res.json()
+  } catch (err) {
+    console.error("createAdminRecord error:", err)
+    return { success: false, error: "Network error" }
+  }
 } 
