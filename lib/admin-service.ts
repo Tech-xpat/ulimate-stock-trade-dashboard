@@ -155,13 +155,13 @@ export async function getAdminWalletSettings(options?: { idToken?: string }): Pr
   }
 }
 
-export async function isAdminByEmail(email: string): Promise<boolean> {
+export async function isAdminByEmail(): Promise<boolean> {
   try {
-    const res = await fetch("/api/admin/check-admin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    })
+    // Call API without exposing email - backend verifies via auth token
+    const res = await authFetch("/api/admin/check-admin", "GET", null)
+    if (!res.ok) {
+      return false
+    }
     const data = await res.json()
     return data.isAdmin || false
   } catch (err) {

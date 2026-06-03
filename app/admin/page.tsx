@@ -17,7 +17,7 @@ export default function AdminPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user && user.email) {
-        const adminStatus = await isAdminByEmail(user.email)
+        const adminStatus = await isAdminByEmail()
         if (adminStatus) {
           // Create admin record in Firestore if doesn't exist
           await createAdminRecord(user.uid, user.email)
@@ -45,7 +45,7 @@ export default function AdminPage() {
       const result = await signInWithPopup(auth, googleProvider)
       const user = result.user
 
-      if (user.email && (await isAdminByEmail(user.email))) {
+      if (user.email && (await isAdminByEmail())) {
         await createAdminRecord(user.uid, user.email)
         setIsAdminUser(true)
         setAdminId(user.uid)

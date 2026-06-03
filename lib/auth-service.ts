@@ -45,12 +45,10 @@ export async function createUserProfile(
     "uid" | "createdAt" | "emailVerified" | "profitBalance" | "kycDocuments" | "kycStatus"
   >,
 ) {
-  const isAdmin = user.email === "ultimatestckstrade@gmail.com" || user.email === "empiredigitalsworldwide@gmail.com"
-
   const userProfile: UserProfile = {
     uid: user.uid,
     ...profileData,
-    balance: isAdmin ? 100000000000 : 0,
+    balance: 0,
     profitBalance: 0,
     kycDocuments: [],
     kycStatus: "pending",
