@@ -144,184 +144,207 @@ export function DashboardView({ userName, onNavigate }: DashboardViewProps) {
   ]
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4 pb-6">
-      {/* Balance Section */}
-      <div className="space-y-2">
-        <p className="text-slate-400 text-sm">Your total balance</p>
-        <div className="flex items-end gap-2">
-          <h1 className="text-4xl md:text-5xl font-bold">${(balance + profitBalance).toFixed(2)}</h1>
-          {balance + profitBalance > 0 && (
-            <span className="text-emerald-400 text-base md:text-lg font-semibold mb-1">+0.00%</span>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
-          <div className="text-slate-400">
-            Main Balance: <span className="text-emerald-400 font-semibold">${balance.toFixed(2)}</span>
-          </div>
-          <div className="text-slate-400">
-            Profit Balance: <span className="text-blue-400 font-semibold">${profitBalance.toFixed(2)}</span>
-          </div>
-        </div>
+    <div className="max-w-2xl mx-auto space-y-5 pb-24 px-4">
+      {/* Welcome Section - Compact */}
+      <div className="pt-3">
+        <p className="text-neutral-500 text-xs uppercase tracking-wider font-semibold">Welcome back</p>
+        <h1 className="text-3xl font-bold text-white mt-1">{userName}</h1>
       </div>
 
-      {/* Time Period Tabs */}
-      <div className="flex gap-2 border-b border-slate-800">
-        {(["daily", "weekly", "monthly", "yearly"] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-3 md:px-4 py-2 text-xs md:text-sm font-medium capitalize transition-colors relative ${
-              activeTab === tab ? "text-cyan-400" : "text-slate-400 hover:text-slate-300"
-            }`}
-          >
-            {tab}
-            {activeTab === tab && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 rounded-full"></span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Chart */}
-      <div className="bg-slate-900/50 rounded-2xl p-4 md:p-6 relative" style={{ height: "250px" }}>
-        <div className="absolute top-4 left-4 text-xs text-slate-400">$10k</div>
-        <div className="absolute bottom-20 left-4 text-xs text-slate-400">$8k</div>
-        <div className="absolute bottom-4 left-4 text-xs text-slate-400">$2k</div>
-
-        {/* SVG Chart */}
-        <svg className="w-full h-full" viewBox="0 0 800 300" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M 0 200 Q 100 180, 200 150 T 400 120 Q 500 100, 600 80 T 800 50"
-            fill="url(#chartGradient)"
-            stroke="none"
-          />
-          <path
-            d="M 0 200 Q 100 180, 200 150 T 400 120 Q 500 100, 600 80 T 800 50"
-            fill="none"
-            stroke="#06b6d4"
-            strokeWidth="2"
-          />
-          {/* Tooltip indicator */}
-          <circle cx="400" cy="120" r="6" fill="#06b6d4" />
-          <circle cx="400" cy="120" r="3" fill="white" />
-        </svg>
-
-        {/* Tooltip */}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 bg-cyan-500 text-white px-2 md:px-3 py-1 rounded-lg text-xs md:text-sm font-bold">
-          ▲ 23%
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-3 md:gap-4">
-        <div className="bg-slate-900/50 rounded-2xl p-4 md:p-5">
-          <p className="text-slate-400 text-xs md:text-sm mb-1 md:mb-2">Wallet</p>
-          <p className="text-xl md:text-2xl font-bold text-emerald-400">+ 73.5 %</p>
-        </div>
-        <div className="bg-slate-900/50 rounded-2xl p-4 md:p-5">
-          <p className="text-slate-400 text-xs md:text-sm mb-1 md:mb-2">Market</p>
-          <p className="text-xl md:text-2xl font-bold text-red-400">- 12.0 %</p>
-        </div>
-        <div className="bg-slate-900/50 rounded-2xl p-4 md:p-5">
-          <p className="text-slate-400 text-xs md:text-sm mb-1 md:mb-2">Equity Values</p>
-          <p className="text-xl md:text-2xl font-bold">2,71.50</p>
-        </div>
-        <div className="bg-slate-900/50 rounded-2xl p-4 md:p-5">
-          <p className="text-slate-400 text-xs md:text-sm mb-1 md:mb-2">AVG Costs</p>
-          <p className="text-xl md:text-2xl font-bold">89.10</p>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <h3 className="text-base md:text-lg font-bold">Market Overview</h3>
-        <div className="bg-slate-900/50 rounded-2xl overflow-hidden border border-slate-800">
-          <div id="tradingview-market-overview" className="tradingview-widget-container">
-            <div className="tradingview-widget-container__widget"></div>
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <h3 className="text-base md:text-lg font-bold">Live Crypto Prices</h3>
-        <div className="grid grid-cols-1 gap-2">
-          {cryptoData.map((crypto) => {
-            const priceData = cryptoPrices[crypto.id as keyof typeof cryptoPrices]
-            return (
-              <div key={crypto.id} className="bg-slate-900/50 rounded-xl p-3 md:p-4 flex items-center justify-between">
-                <div className="flex items-center gap-2 md:gap-3">
-                  <div
-                    className={`w-8 h-8 md:w-10 md:h-10 bg-${crypto.color}-500/20 rounded-full flex items-center justify-center`}
-                  >
-                    <span className="text-lg md:text-xl">{crypto.icon}</span>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm md:text-base">{crypto.name}</p>
-                    <p className="text-xs text-slate-400">{crypto.symbol}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-sm md:text-base">
-                    ${priceData.price < 1 ? priceData.price.toFixed(4) : priceData.price.toLocaleString()}
-                  </p>
-                  <div className="flex items-center gap-1 justify-end">
-                    {priceData.change >= 0 ? (
-                      <TrendingUp className="w-3 h-3 text-emerald-400" />
-                    ) : (
-                      <TrendingDown className="w-3 h-3 text-red-400" />
-                    )}
-                    <p className={`text-xs ${priceData.change >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                      {priceData.change >= 0 ? "+" : ""}
-                      {priceData.change.toFixed(2)}%
-                    </p>
-                  </div>
-                </div>
+      {/* Portfolio Value Card - Premium */}
+      <div className="bg-neutral-900 rounded-2xl p-6 border border-neutral-800">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <p className="text-neutral-500 text-xs uppercase tracking-wider font-semibold mb-2">Portfolio Value</p>
+            <h2 className="text-4xl font-bold text-white">${(balance + profitBalance).toFixed(2)}</h2>
+            <div className="flex items-center gap-4 mt-3">
+              <div>
+                <p className="text-neutral-500 text-xs">≈ {((balance + profitBalance) / 40000).toFixed(6)} BTC</p>
               </div>
-            )
-          })}
+              <div className="flex items-center gap-1 bg-lime-400/10 px-2 py-1 rounded">
+                <span className="text-lime-400 text-xs font-semibold">+12.45%</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="grid grid-cols-2 gap-3 md:gap-4">
+      {/* Balance Cards Grid - 2 Column */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Available Balance */}
+        <div className="bg-neutral-900 rounded-xl p-4 border border-neutral-800">
+          <p className="text-neutral-500 text-xs uppercase tracking-wide font-semibold mb-3">Available</p>
+          <h3 className="text-2xl font-bold text-white">${balance.toFixed(2)}</h3>
+          <p className="text-neutral-500 text-xs mt-2">{(balance / 40000).toFixed(6)} BTC</p>
+        </div>
+        
+        {/* Profit Balance */}
+        <div className="bg-neutral-900 rounded-xl p-4 border border-neutral-800">
+          <p className="text-neutral-500 text-xs uppercase tracking-wide font-semibold mb-3">Earnings</p>
+          <h3 className="text-2xl font-bold text-lime-400">${profitBalance.toFixed(2)}</h3>
+          <p className="text-neutral-500 text-xs mt-2">{(profitBalance / 40000).toFixed(6)} BTC</p>
+        </div>
+      </div>
+
+      {/* Action Buttons - Compact */}
+      <div className="grid grid-cols-2 gap-3">
         <button
           onClick={() => onNavigate("deposit")}
-          className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 md:py-4 rounded-xl transition-all active:scale-95 text-sm md:text-base"
+          className="bg-lime-400 hover:bg-lime-500 text-black font-bold py-3 rounded-xl transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
         >
-          Add Fund
+          <span>+</span> Deposit
         </button>
         <button
           onClick={() => onNavigate("withdraw")}
-          className="bg-red-500 hover:bg-red-600 text-white font-bold py-3 md:py-4 rounded-xl transition-all active:scale-95 text-sm md:text-base"
+          className="bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 rounded-xl transition-all active:scale-95 text-sm flex items-center justify-center gap-2 border border-neutral-700"
         >
-          Withdraw
+          <span>↗</span> Withdraw
         </button>
       </div>
 
-      <div className="bg-slate-900/50 rounded-2xl p-4 md:p-5 border border-slate-800">
-        <label className="text-xs md:text-sm text-slate-400 mb-2 block">Display Currency</label>
-        <select
-          value={selectedCurrency}
-          onChange={(e) => setSelectedCurrency(e.target.value)}
-          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
-        >
-          <option value="USD">US Dollar (USD)</option>
-          <option value="EUR">Euro (EUR)</option>
-          <option value="GBP">British Pound (GBP)</option>
-          <option value="JPY">Japanese Yen (JPY)</option>
-          <option value="AUD">Australian Dollar (AUD)</option>
-          <option value="CAD">Canadian Dollar (CAD)</option>
-          <option value="CHF">Swiss Franc (CHF)</option>
-          <option value="CNY">Chinese Yuan (CNY)</option>
-          <option value="INR">Indian Rupee (INR)</option>
-          <option value="ZAR">South African Rand (ZAR)</option>
-        </select>
+      {/* Portfolio Performance Section */}
+      <div className="bg-neutral-900 rounded-2xl p-6 border border-neutral-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Portfolio Performance</h3>
+          <select
+            onChange={(e) => setActiveTab(e.target.value as any)}
+            value={activeTab}
+            className="text-xs bg-neutral-800 border border-neutral-700 rounded px-2 py-1 text-neutral-300 focus:outline-none hover:border-neutral-600"
+          >
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </div>
+
+        {/* Earnings Stats - Horizontal */}
+        <div className="flex items-center justify-between py-2 border-t border-neutral-800">
+          <div>
+            <p className="text-neutral-500 text-xs uppercase tracking-wider font-semibold">Earnings</p>
+            <p className="text-2xl font-bold text-lime-400 mt-1">${(balance + profitBalance).toFixed(2)}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-neutral-500 text-xs uppercase tracking-wider font-semibold">Change</p>
+            <p className="text-lg font-bold text-lime-400 mt-1">+12.45%</p>
+          </div>
+        </div>
+
+        {/* Chart */}
+        <div className="pt-2" style={{ height: "180px" }}>
+          <svg className="w-full h-full" viewBox="0 0 800 300" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#d4ff00" stopOpacity="0.15" />
+                <stop offset="100%" stopColor="#d4ff00" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M 0 200 Q 100 180, 200 150 T 400 120 Q 500 100, 600 80 T 800 50"
+              fill="url(#chartGradient)"
+              stroke="none"
+            />
+            <path
+              d="M 0 200 Q 100 180, 200 150 T 400 120 Q 500 100, 600 80 T 800 50"
+              fill="none"
+              stroke="#d4ff00"
+              strokeWidth="2"
+            />
+            <circle cx="400" cy="120" r="4" fill="#d4ff00" />
+          </svg>
+        </div>
       </div>
+
+      {/* Recent Transactions */}
+      <div className="bg-neutral-900 rounded-2xl p-6 border border-neutral-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Recent Transactions</h3>
+          <button className="text-lime-400 text-xs hover:text-lime-300 font-semibold">View All</button>
+        </div>
+        
+        <div className="space-y-3">
+          {/* Deposit Transaction */}
+          <div className="flex items-center justify-between py-3 border-b border-neutral-800 last:border-b-0">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-lime-400/20 rounded-lg flex items-center justify-center text-xs">
+                <span className="text-lime-400">↓</span>
+              </div>
+              <div className="flex-1">
+                <p className="text-white text-sm font-medium">Deposit</p>
+                <p className="text-neutral-500 text-xs">Wallet Funding via USDT</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-lime-400 text-sm font-semibold">+$2,500</p>
+            </div>
+          </div>
+
+          {/* Withdrawal Transaction */}
+          <div className="flex items-center justify-between py-3 border-b border-neutral-800 last:border-b-0">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-red-500/20 rounded-lg flex items-center justify-center text-xs">
+                <span className="text-red-400">↑</span>
+              </div>
+              <div className="flex-1">
+                <p className="text-white text-sm font-medium">Withdrawal</p>
+                <p className="text-neutral-500 text-xs">USDT to 0x8d***9f83</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-red-400 text-sm font-semibold">-$1,200</p>
+            </div>
+          </div>
+
+          {/* Profit Transaction */}
+          <div className="flex items-center justify-between py-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-lime-400/20 rounded-lg flex items-center justify-center text-xs">
+                <span className="text-lime-400">+</span>
+              </div>
+              <div className="flex-1">
+                <p className="text-white text-sm font-medium">Trading Profit</p>
+                <p className="text-neutral-500 text-xs">Realized gain from trade</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-lime-400 text-sm font-semibold">+$560</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Access */}
+      <div className="grid grid-cols-3 gap-3">
+        <button className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex flex-col items-center gap-2 hover:bg-neutral-800 transition-colors">
+          <span className="text-xl">💰</span>
+          <p className="text-xs text-center text-neutral-400 font-medium">Deposit</p>
+        </button>
+        <button className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex flex-col items-center gap-2 hover:bg-neutral-800 transition-colors">
+          <span className="text-xl">📤</span>
+          <p className="text-xs text-center text-neutral-400 font-medium">Withdraw</p>
+        </button>
+        <button className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex flex-col items-center gap-2 hover:bg-neutral-800 transition-colors">
+          <span className="text-xl">↔</span>
+          <p className="text-xs text-center text-neutral-400 font-medium">Transfer</p>
+        </button>
+      </div>
+
+      {/* Referral Earnings Card */}
+      <div className="bg-neutral-900 rounded-2xl p-6 border border-neutral-800 overflow-hidden relative">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <p className="text-neutral-500 text-xs uppercase tracking-wider font-semibold">Referral Earnings</p>
+            <h3 className="text-2xl font-bold text-white mt-2">Invite & Earn</h3>
+            <p className="text-neutral-400 text-sm mt-1">Get up to 10% commission on referrals</p>
+            <button className="text-lime-400 text-xs font-semibold hover:text-lime-300 mt-3 uppercase tracking-wider">
+              View Referrals →
+            </button>
+          </div>
+          <div className="text-4xl opacity-20">🎁</div>
+        </div>
+      </div>
+
+
     </div>
   )
 }

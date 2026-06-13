@@ -169,21 +169,20 @@ export default function SignUpPage() {
 
 
   return (
-    <div className="min-h-screen bg-[#0A2E3C] flex flex-col">
+    <div className="min-h-screen bg-[black] flex flex-col">
       <div className="flex-1 flex items-center justify-center p-4 py-8 overflow-y-auto">
         <div className="w-full max-w-md">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                <DollarSign className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold text-white">UltimateStockTrade</h1>
-            </div>
+          <div className="text-center mb-8 animate-logo-bounce-in">
+            <img
+              src="https://i.ibb.co/DPWT64HW/file-00000000899871f49095bc51ed0ef7c0.png"
+              alt="Elite Block Market"
+              className="w-20 h-20 mx-auto"
+            />
           </div>
 
-          <div className="bg-[#0A2E3C] border-2 border-teal-700/50 rounded-xl p-6 shadow-2xl">
+          <div className="bg-[black] border-2 border-lime-400/50 rounded-xl p-6 shadow-2xl animate-form-scale-in">
             <h2 className="text-xl font-semibold text-white text-center mb-2">Create an account</h2>
-            <p className="text-xs text-slate-400 text-center mb-6">Join UltimateStockTrade and start trading today</p>
+            <p className="text-xs text-slate-400 text-center mb-6">Join Elite Block Market and start trading today</p>
 
             {message && (
               <div
@@ -201,9 +200,9 @@ export default function SignUpPage() {
             )}
 
             {/* Tips Section */}
-            <div className="mb-6 bg-blue-900/20 border border-blue-800/50 rounded-lg p-3">
-              <p className="text-xs text-blue-300 font-semibold mb-2">Setup Tips:</p>
-              <ul className="text-xs text-blue-200 space-y-1">
+            <div className="mb-6 bg-lime-400/20 border border-lime-400/50 rounded-lg p-3">
+              <p className="text-xs text-black font-semibold mb-2">Setup Tips:</p>
+              <ul className="text-xs text-black space-y-1">
                 <li>• Use a unique username you'll remember</li>
                 <li>• Password must be at least 6 characters</li>
                 <li>• Phone number will help with account recovery</li>
@@ -211,19 +210,21 @@ export default function SignUpPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className={`transition-all duration-300 ${focusedField === "firstName" ? "scale-[1.01]" : ""}`}>
-                <Label htmlFor="firstName" className="text-white text-sm mb-1.5 block font-medium">
+              <div className={`transition-all duration-300 ${focusedField === "firstName" ? "scale-[1.02]" : ""}`}>
+                <Label htmlFor="firstName" className={`text-white text-sm mb-1.5 block font-medium transition-all duration-300 ${focusedField === "firstName" ? "text-lime-400" : ""}`}>
                   First Name
                 </Label>
                 <Input
                   id="firstName"
                   type="text"
                   value={formData.firstName}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange("firstName", e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    handleInputChange("firstName", e.target.value)
+                  }}
                   onFocus={() => setFocusedField("firstName")}
                   onBlur={() => setFocusedField(null)}
-                  className={`bg-white border-0 text-slate-900 h-11 rounded-lg transition-all duration-300 placeholder:text-slate-400 ${
-                    focusedField === "firstName" ? "ring-2 ring-amber-500 shadow-lg shadow-amber-500/20" : ""
+                  className={`bg-neutral-800 border-0 text-white h-11 rounded-lg transition-all duration-300 placeholder:text-neutral-400 ${
+                    focusedField === "firstName" ? "ring-2 ring-lime-400 shadow-lg shadow-lime-400/30 scale-105" : ""
                   } ${errors.firstName ? "ring-2 ring-red-500" : ""}`}
                   placeholder="First name"
                   disabled={isLoading}
@@ -242,8 +243,8 @@ export default function SignUpPage() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange("lastName", e.target.value)}
                   onFocus={() => setFocusedField("lastName")}
                   onBlur={() => setFocusedField(null)}
-                  className={`bg-white border-0 text-slate-900 h-11 rounded-lg transition-all duration-300 placeholder:text-slate-400 ${
-                    focusedField === "lastName" ? "ring-2 ring-amber-500 shadow-lg shadow-amber-500/20" : ""
+                  className={`bg-neutral-800 border-0 text-white h-11 rounded-lg transition-all duration-300 placeholder:text-neutral-400 ${
+                    focusedField === "lastName" ? "ring-2 ring-lime-400 shadow-lg shadow-lime-400/20" : ""
                   } ${errors.lastName ? "ring-2 ring-red-500" : ""}`}
                   placeholder="Last name"
                   disabled={isLoading}
@@ -262,8 +263,8 @@ export default function SignUpPage() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange("username", e.target.value)}
                   onFocus={() => setFocusedField("username")}
                   onBlur={() => setFocusedField(null)}
-                  className={`bg-white border-0 text-slate-900 h-11 rounded-lg transition-all duration-300 placeholder:text-slate-400 ${
-                    focusedField === "username" ? "ring-2 ring-amber-500 shadow-lg shadow-amber-500/20" : ""
+                  className={`bg-neutral-800 border-0 text-white h-11 rounded-lg transition-all duration-300 placeholder:text-neutral-400 ${
+                    focusedField === "username" ? "ring-2 ring-lime-400 shadow-lg shadow-lime-400/20" : ""
                   } ${errors.username ? "ring-2 ring-red-500" : ""}`}
                   placeholder="Username"
                   disabled={isLoading}
@@ -282,8 +283,8 @@ export default function SignUpPage() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange("phone", e.target.value)}
                   onFocus={() => setFocusedField("phone")}
                   onBlur={() => setFocusedField(null)}
-                  className={`bg-white border-0 text-slate-900 h-11 rounded-lg transition-all duration-300 placeholder:text-slate-400 ${
-                    focusedField === "phone" ? "ring-2 ring-amber-500 shadow-lg shadow-amber-500/20" : ""
+                  className={`bg-neutral-800 border-0 text-white h-11 rounded-lg transition-all duration-300 placeholder:text-neutral-400 ${
+                    focusedField === "phone" ? "ring-2 ring-lime-400 shadow-lg shadow-lime-400/20" : ""
                   } ${errors.phone ? "ring-2 ring-red-500" : ""}`}
                   placeholder="Phone"
                   disabled={isLoading}
@@ -302,8 +303,8 @@ export default function SignUpPage() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange("email", e.target.value)}
                   onFocus={() => setFocusedField("email")}
                   onBlur={() => setFocusedField(null)}
-                  className={`bg-white border-0 text-slate-900 h-11 rounded-lg transition-all duration-300 placeholder:text-slate-400 ${
-                    focusedField === "email" ? "ring-2 ring-amber-500 shadow-lg shadow-amber-500/20" : ""
+                  className={`bg-neutral-800 border-0 text-white h-11 rounded-lg transition-all duration-300 placeholder:text-neutral-400 ${
+                    focusedField === "email" ? "ring-2 ring-lime-400 shadow-lg shadow-lime-400/20" : ""
                   } ${errors.email ? "ring-2 ring-red-500" : ""}`}
                   placeholder="Email"
                   disabled={isLoading}
@@ -322,13 +323,13 @@ export default function SignUpPage() {
                   disabled={isLoading}
                 >
                   <SelectTrigger
-                    className={`bg-white border-0 text-slate-900 h-11 rounded-lg transition-all duration-300 ${
-                      focusedField === "currency" ? "ring-2 ring-amber-500 shadow-lg shadow-amber-500/20" : ""
+                    className={`bg-neutral-800 border-0 text-white h-11 rounded-lg transition-all duration-300 ${
+                      focusedField === "currency" ? "ring-2 ring-lime-400 shadow-lg shadow-lime-400/20" : ""
                     } ${errors.currency ? "ring-2 ring-red-500" : ""}`}
                   >
                     <SelectValue placeholder="US Dollar" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200 text-slate-900 max-h-60">
+                  <SelectContent className="bg-neutral-800 border-slate-200 text-white max-h-60">
                     {currencies.map((currency) => (
                       <SelectItem key={currency} value={currency} className="hover:bg-slate-100">
                         {currency}
@@ -350,13 +351,13 @@ export default function SignUpPage() {
                   disabled={isLoading}
                 >
                   <SelectTrigger
-                    className={`bg-white border-0 text-slate-900 h-11 rounded-lg transition-all duration-300 ${
-                      focusedField === "country" ? "ring-2 ring-amber-500 shadow-lg shadow-amber-500/20" : ""
+                    className={`bg-neutral-800 border-0 text-white h-11 rounded-lg transition-all duration-300 ${
+                      focusedField === "country" ? "ring-2 ring-lime-400 shadow-lg shadow-lime-400/20" : ""
                     } ${errors.country ? "ring-2 ring-red-500" : ""}`}
                   >
                     <SelectValue placeholder="Select a country" />
                   </SelectTrigger>
-                  <SelectContent className="bg-white border-slate-200 text-slate-900 max-h-60">
+                  <SelectContent className="bg-neutral-800 border-slate-200 text-white max-h-60">
                     {countries.map((country) => (
                       <SelectItem key={country} value={country} className="hover:bg-slate-100">
                         {country}
@@ -379,8 +380,8 @@ export default function SignUpPage() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange("password", e.target.value)}
                     onFocus={() => setFocusedField("password")}
                     onBlur={() => setFocusedField(null)}
-                    className={`bg-white border-0 text-slate-900 h-11 rounded-lg pr-10 transition-all duration-300 placeholder:text-slate-400 ${
-                      focusedField === "password" ? "ring-2 ring-amber-500 shadow-lg shadow-amber-500/20" : ""
+                    className={`bg-neutral-800 border-0 text-white h-11 rounded-lg pr-10 transition-all duration-300 placeholder:text-neutral-400 ${
+                      focusedField === "password" ? "ring-2 ring-lime-400 shadow-lg shadow-lime-400/20" : ""
                     } ${errors.password ? "ring-2 ring-red-500" : ""}`}
                     placeholder="Password"
                     disabled={isLoading}
@@ -409,8 +410,8 @@ export default function SignUpPage() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange("confirmPassword", e.target.value)}
                     onFocus={() => setFocusedField("confirmPassword")}
                     onBlur={() => setFocusedField(null)}
-                    className={`bg-white border-0 text-slate-900 h-11 rounded-lg pr-10 transition-all duration-300 placeholder:text-slate-400 ${
-                      focusedField === "confirmPassword" ? "ring-2 ring-amber-500 shadow-lg shadow-amber-500/20" : ""
+                    className={`bg-neutral-800 border-0 text-white h-11 rounded-lg pr-10 transition-all duration-300 placeholder:text-neutral-400 ${
+                      focusedField === "confirmPassword" ? "ring-2 ring-lime-400 shadow-lg shadow-lime-400/20" : ""
                     } ${errors.confirmPassword ? "ring-2 ring-red-500" : ""}`}
                     placeholder="Confirm password"
                     disabled={isLoading}
@@ -430,7 +431,7 @@ export default function SignUpPage() {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full h-12 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-12 bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <>
@@ -447,7 +448,7 @@ export default function SignUpPage() {
               <span className="text-white text-sm">Already registered? </span>
               <Link
                 href="/auth/login"
-                className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-medium px-6 py-2 rounded-lg transition-all duration-300 hover:scale-105 text-sm ml-2 inline-block"
+                className="bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-500 hover:to-lime-600 text-white font-medium px-6 py-2 rounded-lg transition-all duration-300 hover:scale-105 text-sm ml-2 inline-block"
               >
                 Login
               </Link>
