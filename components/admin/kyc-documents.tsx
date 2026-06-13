@@ -1,19 +1,21 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, onSnapshot, doc, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { FileText, Download, Eye } from "lucide-react"
+import { logUserActivity } from "@/lib/auth-service"
 
 interface KYCDocumentsProps {
   userId?: string
 }
 
 interface KYCDocument {
+  id?: string
   userId: string
   username: string
   documentUrl: string
-  uploadedAt: string
+  uploadedAt: number
   status: "pending" | "approved" | "rejected"
 }
 
@@ -23,10 +25,8 @@ export function KYCDocuments({ userId }: KYCDocumentsProps) {
   const [selectedDoc, setSelectedDoc] = useState<KYCDocument | null>(null)
 
   useEffect(() => {
-    loadDocuments()
-  }, [userId])
-
-  const loadDocuments = async () => {
+    // Use real-time listener so admin sees uploads and status changes live
+    let unsubscribe: any = null
     try {
       let q
       if (userId) {
@@ -34,29 +34,50 @@ export function KYCDocuments({ userId }: KYCDocumentsProps) {
       } else {
         q = query(collection(db, "kycDocuments"))
       }
-
-      const querySnapshot = await getDocs(q)
-      const docs: KYCDocument[] = []
-      querySnapshot.forEach((doc) => {
-        docs.push(doc.data() as KYCDocument)
+      unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const docs: KYCDocument[] = []
+        querySnapshot.forEach((d) => docs.push({ id: d.id, ...(d.data() as KYCDocument) }))
+        setDocuments(docs)
+        setLoading(false)
       })
-      setDocuments(docs)
     } catch (error) {
       console.error("[v0] Load KYC documents error:", error)
-    } finally {
       setLoading(false)
     }
+
+    return () => unsubscribe && unsubscribe()
+  }, [userId])
+
+  const loadDocuments = async () => {
+    // kept for compatibility but no longer required
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 lime-400 border-t-transparent rounded-full animate-pulse"></div>
       </div>
     )
   }
 
   if (selectedDoc) {
+    const handleReview = async (status: "approved" | "rejected") => {
+      try {
+        // update kycDocuments entry
+        await setDoc(doc(db, "kycDocuments", selectedDoc.id), { status }, { merge: true })
+        // update user's profile kycStatus
+        await setDoc(doc(db, "users", selectedDoc.userId), { kycStatus: status }, { merge: true })
+        // log activity
+        await logUserActivity(selectedDoc.userId, {
+          type: "kyc_approved",
+          description: `KYC verification ${status === "approved" ? "approved" : "rejected"}`,
+        })
+        setSelectedDoc({ ...selectedDoc, status })
+      } catch (error) {
+        console.error("[v0] Review KYC doc error:", error)
+      }
+    }
+
     return (
       <div className="space-y-4">
         <button
@@ -102,6 +123,18 @@ export function KYCDocuments({ userId }: KYCDocumentsProps) {
               <Download className="w-4 h-4" />
               Download
             </a>
+            <button
+              onClick={() => handleReview("approved")}
+              className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 rounded-lg"
+            >
+              Approve
+            </button>
+            <button
+              onClick={() => handleReview("rejected")}
+              className="flex-1 bg-red-500 hover:bg-red-600 text-white font-medium py-2 rounded-lg"
+            >
+              Reject
+            </button>
           </div>
         </div>
       </div>
@@ -125,28 +158,37 @@ export function KYCDocuments({ userId }: KYCDocumentsProps) {
           {documents.map((doc, index) => (
             <div
               key={index}
-              className="bg-slate-900 rounded-lg border border-slate-800 p-4 flex items-center justify-between"
+              className="bg-slate-900 rounded-lg border border-slate-800 p-4 space-y-3"
             >
-              <div>
-                <p className="text-white font-medium">{doc.username}</p>
-                <p className="text-sm text-slate-400">{new Date(doc.uploadedAt).toLocaleString()}</p>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-white font-medium text-lg">{doc.username}</p>
+                  <p className="text-sm text-slate-400">Submitted: {new Date(doc.uploadedAt).toLocaleString()}</p>
+                  <p className="text-xs text-slate-500 mt-1">Document ID: {doc.id?.slice(0, 20)}...</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
+                      doc.status === "approved"
+                        ? "bg-emerald-500/20 text-emerald-400"
+                        : doc.status === "rejected"
+                          ? "bg-red-500/20 text-red-400"
+                          : "bg-yellow-500/20 text-yellow-400"
+                    }`}
+                  >
+                    {doc.status === "approved" ? "✓" : doc.status === "rejected" ? "✕" : "⏳"}
+                    {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    doc.status === "approved"
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : doc.status === "rejected"
-                        ? "bg-red-500/20 text-red-400"
-                        : "bg-yellow-500/20 text-yellow-400"
-                  }`}
-                >
-                  {doc.status}
-                </span>
-                <button onClick={() => setSelectedDoc(doc)} className="text-amber-500 hover:text-amber-400 p-2">
-                  <Eye className="w-5 h-5" />
-                </button>
-              </div>
+
+              <button
+                onClick={() => setSelectedDoc(doc)}
+                className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-lg transition-colors"
+              >
+                <Eye className="w-4 h-4" />
+                Review Document
+              </button>
             </div>
           ))}
         </div>

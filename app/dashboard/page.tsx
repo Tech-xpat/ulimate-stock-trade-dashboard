@@ -1,11 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { onAuthStateChanged } from "firebase/auth"
-import { useRouter } from "next/navigation"
-import { auth } from "@/lib/firebase"
-import { isAdminByEmail } from "@/lib/admin-service"
-import { getUserProfile, signOutUser, logUserActivity, type UserProfile } from "@/lib/auth-service"
 import { DashboardView } from "@/components/dashboard-view"
 import { TransactionHistory } from "@/components/transaction-history"
 import { DepositView } from "@/components/deposit-view"
@@ -20,37 +15,36 @@ import { ReferralsView } from "@/components/referrals-view"
 import { SupportView } from "@/components/support-view"
 import { ActivityNotifications } from "@/components/activity-notifications"
 import { SettingsView } from "@/components/settings-view"
-import { ActivityPanel } from "@/components/activity-panel"
+import { LicenseView } from "@/components/license-view"
+import { TermsView } from "@/components/terms-view"
+import { OnboardingModal } from "@/components/onboarding-modal"
+import { onAuthStateChanged } from "firebase/auth"
+import { auth } from "@/lib/firebase"
+import { useRouter } from "next/navigation"
+import { getUserProfile, signOutUser, type UserProfile } from "@/lib/auth-service"
 
-export default function RootPage() {
+export default function TradingDashboard() {
   const router = useRouter()
   const [activeView, setActiveView] = useState<
-    "dashboard" | "history" | "activity" | "deposit" | "withdraw" | "buy" | "sell" | "kyc" | "referrals" | "support" | "settings"
+    | "dashboard"
+    | "history"
+    | "deposit"
+    | "withdraw"
+    | "buy"
+    | "sell"
+    | "kyc"
+    | "referrals"
+    | "support"
+    | "settings"
+    | "license"
+    | "terms"
   >("dashboard")
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [userName, setUserName] = useState("")
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push("/auth/login")
-      } else {
-        const isAdmin = user.email ? await isAdminByEmail(user.email) : false
-
-        if (isAdmin) {
-          router.push("/admin")
-        } else {
-          router.push("/dashboard")
-        }
-      }
-      setIsLoading(false)
-    })
-
-    return () => unsubscribe()
-  }, [router])
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -61,19 +55,12 @@ export default function RootPage() {
           setUserName(`${profile.firstName} ${profile.lastName}`)
           setIsAuthenticated(true)
 
-          // Log login activity
-          try {
-            await logUserActivity(user.uid, {
-              type: "login",
-              description: `${profile.displayName || profile.firstName + " " + profile.lastName} logged in`,
-            })
-          } catch (error) {
-            console.error("[v0] Failed to log login activity:", error)
+          // Check if onboarding is needed
+          if (!profile.onboardingCompleted) {
+            setShowOnboarding(true)
           }
         }
       } else {
-        setIsAuthenticated(false)
-        setUserProfile(null)
         router.push("/auth/login")
       }
       setIsLoading(false)
@@ -102,10 +89,10 @@ export default function RootPage() {
       if (!res.ok) {
         console.error("Zoho send error:", data)
       } else {
-        console.log("Welcome email sent:", data.message)
+        console.log("✅ Welcome email sent:", data.message)
       }
     } catch (error) {
-      console.error("Failed to send welcome email:", error)
+      console.error("❌ Failed to send welcome email:", error)
     }
   }
 
@@ -121,11 +108,9 @@ export default function RootPage() {
       case "dashboard":
         return <DashboardView userName={userName} onNavigate={setActiveView} />
       case "history":
-        return userProfile?.uid ? <TransactionHistory userId={userProfile.uid} /> : <div>Loading...</div>
-      case "activity":
-        return userProfile?.uid ? <ActivityPanel userId={userProfile.uid} maxItems={50} /> : <div>Loading...</div>
+        return <TransactionHistory userId={userProfile?.uid || ""} />
       case "deposit":
-        return userProfile ? <DepositView userId={userProfile.uid} username={userName} /> : <div>Loading...</div>
+        return <DepositView userId={userProfile?.uid || ""} username={userProfile?.username || ""} />
       case "withdraw":
         return (
           <WithdrawView userId={userProfile?.uid} username={userName} availableBalance={userProfile?.balance || 0} />
@@ -139,9 +124,13 @@ export default function RootPage() {
       case "referrals":
         return <ReferralsView />
       case "support":
-        return <SupportView />
+        return <SupportView userId={userProfile?.uid || ""} username={userProfile?.username || ""} />
       case "settings":
         return <SettingsView userName={userName} userProfile={userProfile || undefined} />
+      case "license":
+        return <LicenseView />
+      case "terms":
+        return <TermsView />
       default:
         return <DashboardView userName={userName} onNavigate={setActiveView} />
     }
@@ -149,9 +138,9 @@ export default function RootPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-lime-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-white">Loading...</p>
         </div>
       </div>
@@ -163,12 +152,12 @@ export default function RootPage() {
   }
 
   return (
-    <div className="bg-slate-950 min-h-screen font-sans text-white pb-20">
+    <div className="bg-black min-h-screen font-sans text-white pb-20">
       <TopBar
         onMenuClick={() => setIsMenuOpen(true)}
         userName={userName}
         onNavigateToKyc={() => setActiveView("kyc")}
-        userProfile={userProfile || undefined}
+        onLogout={handleLogout}
       />
       <SideMenu
         isOpen={isMenuOpen}
@@ -179,9 +168,24 @@ export default function RootPage() {
           setIsMenuOpen(false)
         }}
       />
-      <ActivityNotifications userProfile={userProfile || undefined} />
+      <ActivityNotifications />
       <main className="px-4 pt-4">{renderView()}</main>
       <BottomNav activeView={activeView} onNavigate={setActiveView} />
+      {userProfile && (
+        <OnboardingModal
+          userProfile={userProfile}
+          isOpen={showOnboarding}
+          onClose={(updated) => {
+            setShowOnboarding(false)
+            if (updated) {
+              // Refresh user profile to get updated onboardingCompleted status
+              getUserProfile(userProfile.uid).then((profile) => {
+                if (profile) setUserProfile(profile)
+              })
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

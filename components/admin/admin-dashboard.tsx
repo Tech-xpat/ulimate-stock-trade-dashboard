@@ -4,8 +4,12 @@ import { useState } from "react"
 import { UsersManagement } from "./users-management"
 import { WalletSettings } from "./wallet-settings"
 import { WithdrawalRequests } from "./withdrawal-requests"
+import { DepositRequests } from "./deposit-requests"
 import { TransactionsManagement } from "./transactions-management"
 import { AdminStats } from "./admin-stats"
+import { SetupControls } from "./setup-controls"
+import { KYCCollection } from "./kyc-collection"
+import { AdminMessages } from "./admin-messages"
 import { signOutUser } from "@/lib/auth-service"
 import { useRouter } from "next/navigation"
 
@@ -14,7 +18,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ adminId }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "wallets" | "withdrawals" | "transactions">(
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "wallets" | "deposits" | "withdrawals" | "transactions" | "setup" | "kyc" | "messages">(
     "overview",
   )
   const router = useRouter()
@@ -32,13 +36,13 @@ export function AdminDashboard({ adminId }: AdminDashboardProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <img
-                src="/images/design-mode/Whats-App-Image-2025-10-10-at-8-45-37-AM-1-removebg-preview-1.png"
-                alt="UltimateStckTrader Logo"
+                src="https://i.ibb.co/DPWT64HW/file-00000000899871f49095bc51ed0ef7c0.png"
+                alt="Elite Block Market Logo"
                 className="w-10 h-10 object-contain"
               />
               <div>
                 <h1 className="text-xl font-bold text-white">Admin Panel</h1>
-                <p className="text-xs text-slate-400">UltimateStckTrader</p>
+                <p className="text-xs text-slate-400">Elite Block Market</p>
               </div>
             </div>
             <button
@@ -65,7 +69,11 @@ export function AdminDashboard({ adminId }: AdminDashboardProps) {
               { id: "overview", label: "Overview", icon: "📊" },
               { id: "users", label: "Users", icon: "👥" },
               { id: "wallets", label: "Wallet Settings", icon: "💳" },
+              { id: "setup", label: "Setup Controls", icon: "⚙️" },
+              { id: "deposits", label: "Deposits", icon: "💰" },
               { id: "withdrawals", label: "Withdrawals", icon: "💸" },
+              { id: "kyc", label: "KYC Collection", icon: "📋" },
+              { id: "messages", label: "Messages", icon: "💬" },
               { id: "transactions", label: "Transactions", icon: "📝" },
             ].map((tab) => (
               <button
@@ -90,7 +98,11 @@ export function AdminDashboard({ adminId }: AdminDashboardProps) {
         {activeTab === "overview" && <AdminStats />}
         {activeTab === "users" && <UsersManagement />}
         {activeTab === "wallets" && <WalletSettings adminId={adminId} />}
+        {activeTab === "setup" && <SetupControls adminId={adminId} />}
+        {activeTab === "deposits" && <DepositRequests adminId={adminId} />}
         {activeTab === "withdrawals" && <WithdrawalRequests adminId={adminId} />}
+        {activeTab === "kyc" && <KYCCollection adminId={adminId} />}
+        {activeTab === "messages" && <AdminMessages adminId={adminId} />}
         {activeTab === "transactions" && <TransactionsManagement />}
       </main>
     </div>

@@ -1,274 +1,360 @@
-// ...existing code...
 "use client"
-
-import React, { useState } from "react"
-import { Bitcoin, Wallet, AlertCircle, Check } from "lucide-react"
+import { useState, useMemo, useEffect } from "react"
+import { Wallet, Check, AlertCircle } from "lucide-react"
 import { createWithdrawalRequest } from "@/lib/admin-service"
+import { auth } from "@/lib/firebase"
 
 interface WithdrawViewProps {
-  userId: string
-  username: string
-  availableBalance: number
+  userId?: string
+  username?: string
+  availableBalance?: number
 }
 
-export function WithdrawView({ userId, username, availableBalance }: WithdrawViewProps) {
+export function WithdrawView({ userId = "", username = "", availableBalance = 0 }: WithdrawViewProps) {
   const [amount, setAmount] = useState("")
-  const [selectedCrypto, setSelectedCrypto] = useState<"BTC" | "USDT">("BTC")
+  const [selectedCrypto, setSelectedCrypto] = useState<string>("BTC")
   const [walletAddress, setWalletAddress] = useState("")
+  const [withdrawMethod, setWithdrawMethod] = useState<"crypto" | "bank">("crypto")
+
+  const [bankCountry, setBankCountry] = useState<string>("United States")
+  const [bankName, setBankName] = useState<string>("")
+  const [accountNumber, setAccountNumber] = useState<string>("")
+  const [accountHolderName, setAccountHolderName] = useState<string>("")
+
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
+  const [updatedBalance, setUpdatedBalance] = useState<number | null>(null)
+  const [withdrawalId, setWithdrawalId] = useState("")
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false)
 
   const MIN_WITHDRAWAL = 100
-  const quickPercentages = [25, 50, 75, 100]
 
-  const handlePercentage = (percentage: number) => {
-    const withdrawAmount = ((availableBalance * percentage) / 100).toFixed(2)
-    setAmount(withdrawAmount)
-  }
+  const BANK_OPTIONS: Record<string, string[]> = useMemo(
+    () => ({
+      "United States": ["Bank of America", "Chase", "Wells Fargo", "CitiBank", "US Bank", "PNC Bank"],
+      Canada: ["RBC", "TD Canada Trust", "Scotiabank", "BMO", "CIBC"],
+      "United Kingdom": ["HSBC", "Barclays", "Lloyds", "NatWest", "Santander"],
+      Nigeria: ["Zenith Bank", "GTBank", "UBA", "Access Bank", "First Bank"],
+      Ghana: ["Ecobank", "GCB Bank", "Fidelity Bank Ghana", "Stanbic Ghana"],
+      Kenya: ["Equity Bank", "KCB", "Co-operative Bank", "Stanbic Bank Kenya"],
+      "South Africa": ["Standard Bank", "FNB", "Nedbank", "Absa", "Capitec"],
+      Liberia: ["LBDI", "Ecobank Liberia", "UBA Liberia", "Global Bank Liberia"],
+      "United Arab Emirates": ["Emirates NBD", "Abu Dhabi Commercial Bank", "Mashreq Bank"],
+      India: ["SBI", "HDFC Bank", "ICICI Bank", "Axis Bank"],
+      China: ["ICBC", "China Construction Bank", "Agricultural Bank of China", "Bank of China"],
+      Brazil: ["Itaú", "Bradesco", "Banco do Brasil", "Santander Brasil"],
+    }),
+    [],
+  )
+
+  useEffect(() => {
+    if (BANK_OPTIONS[bankCountry] && !bankName) {
+      setBankName(BANK_OPTIONS[bankCountry][0])
+    }
+  }, [bankCountry, bankName, BANK_OPTIONS])
+
+  useEffect(() => {
+    if (!userId) {
+      const currentUser = auth.currentUser
+      if (currentUser) {
+        console.log("[v0] Using current user ID:", currentUser.uid)
+      }
+    }
+  }, [userId])
 
   const handleWithdraw = async () => {
-    const parsedAmount = Number.parseFloat(amount || "0")
+    const parsedAmount = Number(amount || "0")
 
-    // basic validation
-    if (!amount || !walletAddress || parsedAmount <= 0 || parsedAmount > availableBalance || parsedAmount < MIN_WITHDRAWAL) {
+    if (isNaN(parsedAmount) || parsedAmount < MIN_WITHDRAWAL || parsedAmount > availableBalance) {
       setErrorMessage(
-        !walletAddress
-          ? "Please add a wallet address."
-          : parsedAmount < MIN_WITHDRAWAL
+        parsedAmount < MIN_WITHDRAWAL
           ? `Minimum withdrawal is $${MIN_WITHDRAWAL}.`
           : parsedAmount > availableBalance
-          ? "Withdrawal amount exceeds available balance."
-          : "Please enter a valid amount."
+            ? "Withdrawal amount exceeds available balance."
+            : "Please enter a valid amount.",
       )
       return
+    }
+
+    if (withdrawMethod === "crypto" && !walletAddress) {
+      setErrorMessage("Please enter your crypto wallet address.")
+      return
+    }
+
+    if (withdrawMethod === "bank") {
+      if (!bankCountry || !bankName || !accountNumber || !accountHolderName) {
+        setErrorMessage("Please fill in all bank details.")
+        return
+      }
     }
 
     setIsLoading(true)
     setErrorMessage("")
 
     try {
-      const result = await createWithdrawalRequest(
-        userId,
+      const destination =
+        withdrawMethod === "crypto"
+          ? walletAddress
+          : `BANK|${bankCountry}|${bankName}|${accountHolderName}|${accountNumber}`
+
+      const currency = withdrawMethod === "crypto" ? selectedCrypto : "BANK"
+
+      const currentUser = auth.currentUser
+      if (!currentUser) {
+        setErrorMessage("User not authenticated")
+        setIsLoading(false)
+        return
+      }
+
+      console.log("[v0] Submitting withdrawal:", {
+        userId: currentUser.uid,
         username,
         parsedAmount,
-        selectedCrypto,
-        walletAddress,
-      )
+        currency,
+        destination,
+      })
 
-      if (result && result.success) {
-        setIsSubmitted(true)
+      const result = await createWithdrawalRequest(currentUser.uid, username, parsedAmount, currency, destination)
+
+      console.log("[v0] Withdrawal result:", result)
+
+      if (result?.success) {
+        setShowSuccessAnimation(true)
+        setTimeout(() => {
+          setWithdrawalId(result.requestId || "")
+          setUpdatedBalance(result.newBalance || 0)
+          setIsSubmitted(true)
+          setShowSuccessAnimation(false)
+        }, 1000)
       } else {
-        setErrorMessage(result?.message || "Processed sucessfully.")
+        setErrorMessage(result?.error || "Failed to process withdrawal request.")
       }
     } catch (err) {
-      setErrorMessage("Network error. Please try again.")
+      console.error("[v0] Withdraw error:", err)
+      setErrorMessage("Network or server error. Please try again.")
     } finally {
       setIsLoading(false)
     }
   }
 
-  if (isSubmitted) {
+  if (showSuccessAnimation) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-8 text-center space-y-4">
-          <div className="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center mx-auto">
-            <Check className="w-8 h-8 text-white" />
+      <div className="max-w-2xl mx-auto text-center space-y-6 py-12">
+        <div className="flex justify-center">
+          <div className="relative w-24 h-24">
+            <div className="absolute inset-0 bg-gradient-to-r from-lime-400 to-lime-400 rounded-full animate-spin opacity-30"></div>
+            <div className="absolute inset-2 bg-black rounded-full flex items-center justify-center">
+              <svg
+                className="w-12 h-12 text-lime-400 animate-bounce"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xl font-bold text-emerald-400 mb-2">Withdrawal Request Submitted!</h3>
-            <p className="text-slate-300 text-sm">
-              Your withdrawal request for ${amount} has been submitted. You will be
-              notified once it's processed.
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setIsSubmitted(false)
-              setAmount("")
-              setWalletAddress("")
-              setErrorMessage("")
-            }}
-            className="text-emerald-400 hover:text-emerald-300 text-sm font-medium"
-          >
-            Make Another Withdrawal
-          </button>
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-2xl font-bold text-lime-400">Processing Your Withdrawal</h3>
+          <p className="text-neutral-300 text-sm">Please wait while we process your request...</p>
         </div>
       </div>
     )
   }
 
-  const parsedAmountForWarning = Number.parseFloat(amount || "0")
-  const formDisabled = isLoading || availableBalance < MIN_WITHDRAWAL
-
-  return (
-    <div className="max-w-2xl mx-auto space-y-4 md:space-y-6 pb-6">
-      <div>
-        <h2 className="text-xl md:text-2xl font-bold mb-1">Withdraw Funds</h2>
-        <p className="text-slate-400 text-xs md:text-sm">Transfer money from your account</p>
-      </div>
-
-      {/* Available Balance */}
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-4 md:p-5 border border-slate-700">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-slate-400 text-xs md:text-sm mb-1">Available Balance</p>
-            <p className="text-2xl md:text-3xl font-bold">${availableBalance?.toFixed(2)}</p>
-          </div>
-          <Wallet className="w-8 h-8 md:w-10 md:h-10 text-slate-600" />
+  if (isSubmitted) {
+    const finalBalance = updatedBalance !== null ? updatedBalance : availableBalance - Number(amount || 0)
+    return (
+      <div className="max-w-2xl mx-auto text-center space-y-6 bg-gradient-to-br from-lime-400/10 to-lime-400/5 border border-lime-400/20 rounded-2xl p-8">
+        <div className="w-16 h-16 bg-lime-400 rounded-full flex items-center justify-center mx-auto animate-pulse">
+          <Check className="w-8 h-8 text-white" />
         </div>
-      </div>
+        <div className="space-y-2">
+          <h3 className="text-2xl font-bold text-lime-400">Withdrawal Request Submitted!</h3>
+          <p className="text-neutral-300 text-sm">Your request has been sent to admin for approval.</p>
+        </div>
 
-      {/* Balance too low notice */}
-      {availableBalance < MIN_WITHDRAWAL && (
-        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 md:p-4 flex items-start gap-2 md:gap-3">
-          <AlertCircle className="w-4 h-4 md:w-5 md:h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs md:text-sm text-yellow-300">
-            Your available balance is below the minimum withdrawal amount of ${MIN_WITHDRAWAL}. Add funds to withdraw.
+        <div className="bg-neutral-900/40 border border-lime-400/20 rounded-xl p-4 space-y-3 text-left">
+          <div className="flex justify-between items-center">
+            <span className="text-neutral-400">Withdrawal Amount:</span>
+            <span className="font-bold text-lime-400">${Number(amount || 0).toFixed(2)}</span>
+          </div>
+          <div className="border-t border-neutral-700/50 pt-3 flex justify-between items-center">
+            <span className="text-neutral-400">Updated Balance:</span>
+            <span className="font-bold text-lg text-lime-400">${finalBalance.toFixed(2)}</span>
+          </div>
+          <div className="text-xs text-neutral-400 pt-2">
+            {withdrawMethod === "crypto"
+              ? `Destination: ${walletAddress.substring(0, 10)}...${walletAddress.substring(walletAddress.length - 8)}`
+              : `Bank: ${bankName} (${bankCountry})`}
+          </div>
+          {withdrawalId && (
+            <div className="bg-neutral-800/50 rounded px-2 py-1 text-xs text-neutral-300">
+              Withdrawal ID: {withdrawalId}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-lime-400/10 border border-lime-400/20 rounded-xl p-3 space-y-2">
+          <p className="text-lime-400 text-xs font-semibold">What happens next?</p>
+          <p className="text-lime-300 text-xs leading-relaxed">
+            Your withdrawal request is now pending admin approval. Once approved, funds will be transferred to your{" "}
+            {withdrawMethod === "crypto" ? "crypto wallet" : "bank account"}. You'll receive a notification when the
+            payment is processed.
           </p>
         </div>
-      )}
 
-      {/* Crypto Selection */}
-      <div className="space-y-2">
-        <label className="text-xs md:text-sm font-medium">Select Cryptocurrency</label>
-        <div className="grid grid-cols-2 gap-2 md:gap-3">
-          <button
-            onClick={() => setSelectedCrypto("BTC")}
-            disabled={formDisabled}
-            className={`p-3 md:p-4 rounded-xl border-2 transition-all ${selectedCrypto === "BTC"
-              ? "border-emerald-500 bg-emerald-500/10"
-              : "border-slate-800 bg-slate-900 hover:border-slate-700"
-            }`}
-          >
-            <div className="flex items-center gap-2 md:gap-3">
-              <Bitcoin className="w-5 h-5 md:w-6 md:h-6 text-orange-400" />
-              <div className="text-left">
-                <p className="font-bold text-sm md:text-base">Bitcoin</p>
-                <p className="text-xs text-slate-400">BTC</p>
-              </div>
-            </div>
-          </button>
-          <button
-            onClick={() => setSelectedCrypto("USDT")}
-            disabled={formDisabled}
-            className={`p-3 md:p-4 rounded-xl border-2 transition-all ${selectedCrypto === "USDT"
-              ? "border-emerald-500 bg-emerald-500/10"
-              : "border-slate-800 bg-slate-900 hover:border-slate-700"
-            }`}
-          >
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className="w-5 h-5 md:w-6 md:h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-                <span className="text-xs md:text-sm font-bold">₮</span>
-              </div>
-              <div className="text-left">
-                <p className="font-bold text-sm md:text-base">Tether</p>
-                <p className="text-xs text-slate-400">USDT</p>
-              </div>
-            </div>
-          </button>
+        <button
+          onClick={() => {
+            setIsSubmitted(false)
+            setAmount("")
+            setWalletAddress("")
+            setAccountNumber("")
+            setAccountHolderName("")
+          }}
+          className="w-full text-lime-400 hover:text-lime-300 text-sm font-medium bg-lime-400/10 hover:bg-lime-400/20 py-2 rounded-xl transition"
+        >
+          Make Another Withdrawal
+        </button>
+      </div>
+    )
+  }
+
+  const parsedAmount = Number(amount || "0")
+  const formDisabled = isLoading || availableBalance < MIN_WITHDRAWAL
+  const isSubmitDisabled =
+    isLoading ||
+    availableBalance < MIN_WITHDRAWAL ||
+    parsedAmount < MIN_WITHDRAWAL ||
+    parsedAmount > availableBalance ||
+    (withdrawMethod === "crypto" && !walletAddress)
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6 pb-8">
+      <h2 className="text-2xl font-bold mb-1">Withdraw Funds</h2>
+      <p className="text-neutral-400 text-sm">Request funds to be withdrawn from your balance</p>
+
+      <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-5 flex justify-between">
+        <div>
+          <p className="text-neutral-400 text-sm">Available Balance</p>
+          <p className="text-3xl font-bold">${Number(availableBalance || 0).toFixed(2)}</p>
         </div>
+        <Wallet className="w-8 h-8 text-neutral-600" />
       </div>
 
-      {/* Amount Input */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6">
-        <label className="text-xs md:text-sm text-slate-400 mb-2 block">Withdrawal Amount (USD)</label>
-        <p className="text-xs text-amber-400 mb-3">Minimum withdrawal: ${MIN_WITHDRAWAL}</p>
-        <div className="relative mb-3 md:mb-4">
-          <span className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-xl md:text-2xl font-bold text-slate-400">
-            $
-          </span>
-          <input
-            type="number"
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
-            min={MIN_WITHDRAWAL}
-            max={availableBalance}
-            disabled={formDisabled}
-            className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 md:pl-10 pr-4 py-3 md:py-4 text-2xl md:text-3xl font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
-          />
-        </div>
-
-        {/* Quick Percentage Buttons */}
-        <div className="grid grid-cols-4 gap-2">
-          {quickPercentages.map((percentage) => (
-            <button
-              key={percentage}
-              onClick={() => handlePercentage(percentage)}
-              disabled={formDisabled}
-              className="bg-slate-800 hover:bg-slate-700 rounded-lg py-2 text-xs md:text-sm font-medium transition-colors active:scale-95 disabled:opacity-60"
-            >
-              {percentage}%
-            </button>
-          ))}
-        </div>
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => setWithdrawMethod("crypto")}
+          className={`p-4 rounded-xl border-2 transition ${
+            withdrawMethod === "crypto"
+              ? "border-lime-400 bg-lime-400/10"
+              : "border-neutral-800 hover:border-neutral-700"
+          }`}
+        >
+          Crypto
+        </button>
+        <button
+          onClick={() => setWithdrawMethod("bank")}
+          className={`p-4 rounded-xl border-2 transition ${
+            withdrawMethod === "bank"
+              ? "border-lime-400 bg-lime-400/10"
+              : "border-neutral-800 hover:border-neutral-700"
+          }`}
+        >
+          Bank
+        </button>
       </div>
 
-      {/* Wallet Address Input */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6">
-        <label className="text-xs md:text-sm text-slate-400 mb-2 block">{selectedCrypto} Wallet Address</label>
+      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5">
+        <label className="text-neutral-400 text-sm block mb-2">Withdrawal Amount</label>
+        <input
+          type="number"
+          step="0.01"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="w-full bg-black border border-neutral-700 rounded-xl px-4 py-3 text-lg font-bold focus:outline-none focus:ring-2 focus:ring-lime-400 text-white"
+          placeholder="Enter amount"
+          disabled={formDisabled}
+        />
+        <p className="text-xs text-neutral-400 mt-2">Minimum: ${MIN_WITHDRAWAL}</p>
+      </div>
+
+      {withdrawMethod === "crypto" ? (
         <input
           type="text"
           value={walletAddress}
           onChange={(e) => setWalletAddress(e.target.value)}
-          placeholder={`Enter your ${selectedCrypto} wallet address`}
+          className="w-full bg-black border border-neutral-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 text-white"
+          placeholder={`${selectedCrypto} wallet address`}
           disabled={formDisabled}
-          className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
         />
-      </div>
+      ) : (
+        <div className="space-y-3 bg-neutral-900 border border-neutral-800 rounded-2xl p-5">
+          <select
+            value={bankCountry}
+            onChange={(e) => {
+              const c = e.target.value
+              setBankCountry(c)
+              setBankName(BANK_OPTIONS[c]?.[0] || "")
+            }}
+            className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 text-white"
+            disabled={formDisabled}
+          >
+            {Object.keys(BANK_OPTIONS).map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
 
-      {/* Warning */}
-      {amount && (parsedAmountForWarning > availableBalance || parsedAmountForWarning < MIN_WITHDRAWAL) && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 md:p-4 flex items-start gap-2 md:gap-3">
-          <AlertCircle className="w-4 h-4 md:w-5 md:h-5 text-red-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs md:text-sm text-red-300">
-            {parsedAmountForWarning > availableBalance
-              ? "Withdrawal amount exceeds available balance"
-              : `Minimum withdrawal amount is $${MIN_WITHDRAWAL}`}
-          </p>
+          <select
+            value={bankName}
+            onChange={(e) => setBankName(e.target.value)}
+            className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 text-white"
+            disabled={formDisabled}
+          >
+            {(BANK_OPTIONS[bankCountry] || []).map((b) => (
+              <option key={b}>{b}</option>
+            ))}
+          </select>
+
+          <input
+            value={accountHolderName}
+            onChange={(e) => setAccountHolderName(e.target.value)}
+            placeholder="Account Holder Name"
+            className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 text-white"
+            disabled={formDisabled}
+          />
+
+          <input
+            value={accountNumber}
+            onChange={(e) => setAccountNumber(e.target.value)}
+            placeholder="Account Number / IBAN"
+            className="w-full bg-black border border-neutral-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-lime-400 text-white"
+            disabled={formDisabled}
+          />
         </div>
       )}
 
-      {/* Inline error message */}
       {errorMessage && (
-        <div className="bg-red-600/10 border border-red-600/20 rounded-xl p-3 md:p-4 text-sm text-red-300">
-          {errorMessage}
+        <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+          <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-300">{errorMessage}</p>
         </div>
       )}
 
-      {/* Withdraw Button */}
       <button
         onClick={handleWithdraw}
-        disabled={
-          !amount ||
-          !walletAddress ||
-          Number.parseFloat(amount || "0") <= 0 ||
-          Number.parseFloat(amount || "0") > availableBalance ||
-          Number.parseFloat(amount || "0") < MIN_WITHDRAWAL ||
-          isLoading ||
-          availableBalance < MIN_WITHDRAWAL
-        }
-        className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3 md:py-4 rounded-xl transition-all duration-300 transform active:scale-95 text-sm md:text-base disabled:opacity-60"
+        disabled={isSubmitDisabled}
+        className="w-full bg-lime-400 hover:bg-lime-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition"
       >
-        {isLoading ? "Submitting..." : `Request Withdrawal $${amount || "0.00"}`}
+        {isLoading ? "Processing Withdrawal..." : `Submit Withdrawal Request - $${amount || "0.00"}`}
       </button>
-
-      {/* Info */}
-      <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 md:p-4 flex gap-3">
-        <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-300">
-          <p className="font-semibold mb-1">Important:</p>
-          <ul className="space-y-1 text-xs">
-    
-            <li>• Processing typically takes 15-60 minutes</li>
-            <li>• Ensure your wallet address is correct</li>
-            <li>• You will be notified once processed</li>
-          </ul>
-        </div>
-      </div>
     </div>
   )
 }
-// ...existing code...
