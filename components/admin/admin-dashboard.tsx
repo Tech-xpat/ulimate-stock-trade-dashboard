@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { UsersManagement } from "./users-management"
 import { WalletSettings } from "./wallet-settings"
+import { AdminTempWallet } from "./admin-temp-wallet"
 import { WithdrawalRequests } from "./withdrawal-requests"
 import { DepositRequests } from "./deposit-requests"
 import { TransactionsManagement } from "./transactions-management"
@@ -18,7 +19,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ adminId }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "wallets" | "deposits" | "withdrawals" | "transactions" | "setup" | "kyc" | "messages">(
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "wallets" | "tempwallet" | "deposits" | "withdrawals" | "transactions" | "setup" | "kyc" | "messages">(
     "overview",
   )
   const router = useRouter()
@@ -68,6 +69,7 @@ export function AdminDashboard({ adminId }: AdminDashboardProps) {
             {[
               { id: "overview", label: "Overview", icon: "📊" },
               { id: "users", label: "Users", icon: "👥" },
+              { id: "tempwallet", label: "Temp Wallet", icon: "💵" },
               { id: "wallets", label: "Wallet Settings", icon: "💳" },
               { id: "setup", label: "Setup Controls", icon: "⚙️" },
               { id: "deposits", label: "Deposits", icon: "💰" },
@@ -97,6 +99,7 @@ export function AdminDashboard({ adminId }: AdminDashboardProps) {
       <main className="p-4">
         {activeTab === "overview" && <AdminStats />}
         {activeTab === "users" && <UsersManagement />}
+        {activeTab === "tempwallet" && <AdminTempWallet adminId={adminId} />}
         {activeTab === "wallets" && <WalletSettings adminId={adminId} />}
         {activeTab === "setup" && <SetupControls adminId={adminId} />}
         {activeTab === "deposits" && <DepositRequests adminId={adminId} />}

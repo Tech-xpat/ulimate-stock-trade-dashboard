@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { signInWithPopup } from "firebase/auth"
+import { signInWithRedirect, getRedirectResult } from "firebase/auth"
 import { auth, googleProvider } from "@/lib/firebase"
 import { isAdminByEmail, createAdminRecord } from "@/lib/admin-service"
 import { Button } from "@/components/ui/button"
@@ -14,25 +14,64 @@ export default function AdminLoginPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
-  const handleGoogleLogin = async () => {
-    setIsLoading(true)
-    setMessage(null)
+  // Check for redirect result on page load
+  useEffect(() => {
+    let isMounted = true
 
+    const checkRedirectResult = async () => {
+      try {
+        console.log("[v0] Checking redirect result...")
+        const result = await getRedirectResult(auth)
+        console.log("[v0] Redirect result:", result?.user?.email || "No user")
+        
+        if (!isMounted) return
+        
+        if (result && result.user) {
+          console.log("[v0] User authenticated:", result.user.email)
+          setIsLoading(true)
+          await handleAuthSuccess(result.user)
+        } else {
+          console.log("[v0] No redirect result, user not authenticated yet")
+        }
+      } catch (error: any) {
+        console.error("[v0] Redirect result error:", error.message || error)
+        if (isMounted) {
+          setMessage({ type: "error", text: `Error: ${error.message || "Authentication failed"}` })
+        }
+      } finally {
+        if (isMounted) {
+          setIsCheckingAuth(false)
+        }
+      }
+    }
+
+    checkRedirectResult()
+
+    return () => {
+      isMounted = false
+    }
+  }, [router])
+
+  const handleAuthSuccess = async (user: any) => {
     try {
-      const result = await signInWithPopup(auth, googleProvider)
-      const user = result.user
-
       if (!user.email) {
+        console.error("[v0] No email in user object")
         setMessage({ type: "error", text: "Could not retrieve email from Google account" })
         setIsLoading(false)
         return
       }
 
+      console.log("[v0] Google user authenticated:", user.email)
+
       // Check if email is in approved admin list
+      console.log("[v0] Checking if user is admin...")
       const isAdmin = await isAdminByEmail(user.email)
+      console.log("[v0] isAdmin result:", isAdmin)
 
       if (!isAdmin) {
+        console.log("[v0] User not authorized as admin:", user.email)
         setMessage({
           type: "error",
           text: `Access denied. Email ${user.email} is not authorized as an admin.`,
@@ -43,25 +82,49 @@ export default function AdminLoginPage() {
         return
       }
 
+      console.log("[v0] User is admin, creating admin record...")
       // Create/update admin record
-      await createAdminRecord(user.uid, user.email)
+      const result = await createAdminRecord(user.uid, user.email, user.displayName || user.email)
+      console.log("[v0] Admin record creation result:", result)
 
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create admin record")
+      }
+
+      console.log("[v0] Admin record created successfully, redirecting to dashboard...")
       setMessage({ type: "success", text: "Admin authentication successful! Redirecting..." })
-      setTimeout(() => {
-        router.push("/admin")
-      }, 1000)
+      
+      // Use router.push without timeout for immediate redirect
+      router.push("/admin")
     } catch (error: any) {
-      console.error("[v0] Google admin login error:", error)
-      let errorMessage = "Failed to sign in with Google"
+      console.error("[v0] Auth success error:", error.message || error)
+      setMessage({ type: "error", text: error.message || "An error occurred" })
+      setIsLoading(false)
+    }
+  }
 
-      if (error.code === "auth/popup-closed-by-user") {
-        errorMessage = "Sign-in popup was closed"
-      } else if (error.code === "auth/cancelled-popup-request") {
-        errorMessage = "Sign-in request was cancelled"
+  const handleGoogleLogin = () => {
+    setIsLoading(true)
+    setMessage(null)
+
+    try {
+      // Use redirect instead of popup - bypasses popup blockers completely
+      // User will be redirected to Google, then back to this page
+      // The useEffect hook above will handle the redirect result
+      signInWithRedirect(auth, googleProvider)
+    } catch (error: any) {
+      console.error("[v0] Google redirect error:", error)
+      let errorMessage = "Failed to initiate Google Sign-In"
+
+      if (error.code === "auth/network-request-failed") {
+        errorMessage = "Network error. Please check your connection and try again."
+      } else if (error.code === "auth/operation-not-allowed") {
+        errorMessage = "Google Sign-In is not enabled. Contact support."
+      } else if (error.message) {
+        errorMessage = `Error: ${error.message}`
       }
 
       setMessage({ type: "error", text: errorMessage })
-    } finally {
       setIsLoading(false)
     }
   }
@@ -81,33 +144,44 @@ export default function AdminLoginPage() {
 
           {/* Login Card */}
           <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-8 shadow-2xl backdrop-blur-sm animate-form-scale-in">
-            <h2 className="text-2xl font-bold text-white text-center mb-2">Admin Portal</h2>
-            <p className="text-neutral-400 text-center text-sm mb-8">
-              Sign in with your approved Google account to access the admin dashboard
-            </p>
-
-            {/* Message Display */}
-            {message && (
-              <div
-                className={`mb-6 p-4 rounded-lg flex items-start gap-3 ${
-                  message.type === "success"
-                    ? "bg-lime-400/10 border border-lime-400/30"
-                    : "bg-red-500/10 border border-red-500/30"
-                }`}
-              >
-                {message.type === "success" ? (
-                  <CheckCircle className="w-5 h-5 flex-shrink-0 text-lime-400 mt-0.5" />
-                ) : (
-                  <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-400 mt-0.5" />
-                )}
-                <p className={`text-sm ${message.type === "success" ? "text-lime-300" : "text-red-300"}`}>
-                  {message.text}
-                </p>
+            {isCheckingAuth ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-lime-400 mb-4" />
+                <p className="text-neutral-400 text-sm">Checking authentication...</p>
               </div>
+            ) : (
+              <>
+                <h2 className="text-2xl font-bold text-white text-center mb-2">Admin Portal</h2>
+                <p className="text-neutral-400 text-center text-sm mb-8">
+                  Sign in with your approved Google account to access the admin dashboard
+                </p>
+              </>
             )}
 
-            {/* Google Login Button */}
-            <Button
+            {!isCheckingAuth && (
+              <>
+                {/* Message Display */}
+                {message && (
+                  <div
+                    className={`mb-6 p-4 rounded-lg flex items-start gap-3 ${
+                      message.type === "success"
+                        ? "bg-lime-400/10 border border-lime-400/30"
+                        : "bg-red-500/10 border border-red-500/30"
+                    }`}
+                  >
+                    {message.type === "success" ? (
+                      <CheckCircle className="w-5 h-5 flex-shrink-0 text-lime-400 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-400 mt-0.5" />
+                    )}
+                    <p className={`text-sm ${message.type === "success" ? "text-lime-300" : "text-red-300"}`}>
+                      {message.text}
+                    </p>
+                  </div>
+                )}
+
+                {/* Google Login Button */}
+                <Button
               onClick={handleGoogleLogin}
               disabled={isLoading}
               className="w-full h-12 bg-lime-400 hover:bg-lime-500 text-black font-semibold text-base rounded-lg transition-all duration-300 hover:shadow-lg mb-4 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
@@ -141,11 +215,13 @@ export default function AdminLoginPage() {
                 </>
               )}
             </Button>
-            <div className="mt-6 text-center">
-              <a href="/" className="text-sm text-lime-400 hover:text-lime-300 transition-colors">
-                Back to Login
-              </a>
-            </div>
+                <div className="mt-6 text-center">
+                  <a href="/" className="text-sm text-lime-400 hover:text-lime-300 transition-colors">
+                    Back to Login
+                  </a>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
