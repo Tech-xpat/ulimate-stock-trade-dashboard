@@ -76,7 +76,7 @@ export interface AdminWalletSettings {
 // -------------------------
 
 export async function isAdminByEmail(email: string): Promise<boolean> {
-  const adminEmails = ["Elite Block Marketstrade@gmail.com", "empiredigitalsworldwide@gmail.com"]
+  const adminEmails = ["empiredigitalsworldwide@gmail.com", "bigdrem35@gmail.com"]
   return adminEmails.includes(email)
 }
 
